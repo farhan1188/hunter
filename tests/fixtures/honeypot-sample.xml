@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>Honeypot Jobs</title>
+    <item>
+      <title>Senior Backend Engineer at SampleDE</title>
+      <link>https://www.honeypot.io/jobs/12345</link>
+      <description>Berlin-based remote-friendly role. Visa sponsorship available.</description>
+      <pubDate>Sun, 11 May 2026 09:00:00 GMT</pubDate>
+      <guid>https://www.honeypot.io/jobs/12345</guid>
+    </item>
+  </channel>
+</rss>

@@ -1,0 +1,16 @@
+{
+  "jobs": [
+    {
+      "id": 4001,
+      "internal_job_id": 5001,
+      "title": "Staff Engineer, Platform",
+      "updated_at": "2026-05-12T09:00:00Z",
+      "absolute_url": "https://boards.greenhouse.io/exampleco/jobs/4001",
+      "location": { "name": "Remote - EMEA" },
+      "company_name": "ExampleCo",
+      "content": "%3Cp%3EJoin%20us%20to%20build%20our%20platform.%3C%2Fp%3E",
+      "departments": [],
+      "offices": [{ "name": "Berlin" }]
+    }
+  ]
+}
