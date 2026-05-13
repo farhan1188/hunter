@@ -2,62 +2,41 @@
 
 ## Turso (one-time)
 
-1. Install the CLI on Windows. Pick one:
+> **Note:** Turso doesn't ship a native Windows CLI — provision via the web console.
+> The Hub talks to Turso over HTTP from `@libsql/client`, so no CLI is needed at runtime.
 
-   **a) Scoop (easiest):**
-   ```powershell
-   scoop install turso
-   ```
+1. Go to https://app.turso.tech and sign up / log in.
 
-   **b) WSL (if you have it set up):**
-   ```bash
-   curl -sSfL https://get.tur.so/install.sh | bash
-   ```
+2. **Create Database** → name `job-hunter` → pick the region closest to you
+   (e.g. `aws-ap-south-1` for Mumbai if you're in Pakistan).
 
-   **c) Direct binary download:**
-   Download `turso-cli-windows-amd64.zip` from
-   https://github.com/tursodatabase/turso-cli/releases/latest, unzip somewhere
-   like `C:\Tools\turso\`, then add that folder to your PATH (System Properties →
-   Environment Variables → Path → Edit → New).
+3. On the database's page, copy the **HTTP URL**
+   (`libsql://job-hunter-<you>.turso.io`) → put in `.env` as `TURSO_DATABASE_URL`.
 
-   Verify install: `turso --version`
+4. **Generate Token** → "Full access" → no expiration → copy → put in `.env` as
+   `TURSO_AUTH_TOKEN_FULL` (used by Hub + migrations).
 
-2. Sign up + log in:
+5. **Generate Token** again → "Read only" → no expiration → copy → put in `.env`
+   as `TURSO_AUTH_TOKEN_READ` (used by Backup routine).
 
-   ```bash
-   turso auth signup
-   # or, if you have an account:
-   turso auth login
-   ```
+6. Copy `.env.example` → `.env` if you haven't already, with the values above filled in.
 
-3. Create the database:
-
-   ```bash
-   turso db create job-hunter
-   ```
-
-4. Capture connection info:
-
-   ```bash
-   turso db show job-hunter --url
-   # → libsql://job-hunter-<user>.turso.io  -> put in .env as TURSO_DATABASE_URL
-
-   turso db tokens create job-hunter --expiration none
-   # → eyJ...   -> put in .env as TURSO_AUTH_TOKEN_FULL (used for migrations + Hub)
-
-   turso db tokens create job-hunter --read-only --expiration none
-   # → eyJ...   -> put in .env as TURSO_AUTH_TOKEN_READ
-   ```
-
-5. Copy `.env.example` → `.env` and paste the values in.
-
-6. Apply migrations:
+7. Apply migrations:
 
    ```bash
    npm run db:migrate
    ```
 
    Expected output: `APPLY 001_init.sql` then `Migrations complete.`
+
+### Running ad-hoc SQL
+
+You won't have `turso db shell` locally on Windows. Two options:
+- Use the Turso web console (SQL tab on the database page)
+- Install the CLI inside WSL if you have it (`curl -sSfL https://get.tur.so/install.sh | bash`)
+
+The Backup routine uses `turso db shell ... .dump` but that runs on Anthropic's Linux
+infrastructure where the CLI is available — not on your Windows machine.
 
 ## Anthropic API
 

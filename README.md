@@ -31,7 +31,7 @@ Code routines, covered by your Max subscription.
 
 ## What you need to set up
 
-1. **Install Turso CLI + provision DB** — see [`docs/setup.md`](docs/setup.md) (no native PowerShell installer; use scoop, WSL, or grab the binary from GitHub releases)
+1. **Provision Turso DB via web console** — see [`docs/setup.md`](docs/setup.md) (no Windows CLI exists; use https://app.turso.tech directly)
 2. **Copy `.env.example` to `.env`** and fill in:
    - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN_FULL`, `TURSO_AUTH_TOKEN_READ`
    - `ANTHROPIC_API_KEY`
@@ -59,7 +59,6 @@ Code routines, covered by your Max subscription.
 npm run dev               # Hub at localhost:3000
 npm test                  # all tests
 npm run db:migrate        # apply any new migrations
-npm run db:shell          # open Turso shell
 
 npx tsx scripts/run-adapter.ts remoteok     # crawl one adapter locally (handy for testing)
 npx tsx scripts/run-adapter.ts honeypot
@@ -67,6 +66,8 @@ npx tsx scripts/run-adapter.ts greenhouse
 npx tsx scripts/annotate.ts                  # classify visa for any 'unknown' jobs
 npx tsx scripts/score-feed.ts                # score any unscored jobs (uses your profile)
 ```
+
+For ad-hoc SQL, use the Turso web console's SQL tab (no native CLI on Windows).
 
 ## Phase 1 verification
 
