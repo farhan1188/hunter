@@ -1,0 +1,26 @@
+[
+  { "legal": "RemoteOK terms..." },
+  {
+    "id": "987654",
+    "url": "https://remoteok.com/remote-jobs/987654-senior-typescript-engineer",
+    "position": "Senior TypeScript Engineer",
+    "company": "ExampleCo",
+    "location": "Worldwide",
+    "tags": ["typescript", "node", "react"],
+    "description": "<p>Build cool things in TS.</p>",
+    "date": "2026-05-12T10:00:00Z",
+    "company_logo": "https://example.com/logo.png",
+    "salary_min": 100000,
+    "salary_max": 140000
+  },
+  {
+    "id": "987655",
+    "url": "https://remoteok.com/remote-jobs/987655-staff-platform-eng",
+    "position": "Staff Platform Engineer",
+    "company": "OtherCo",
+    "location": "Europe/Americas",
+    "tags": ["aws", "kubernetes"],
+    "description": "<p>Platform work.</p>",
+    "date": "2026-05-11T08:30:00Z"
+  }
+]

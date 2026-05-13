@@ -1,0 +1,82 @@
+import { getDb } from "@/src/db/client";
+import type { JobPosting, VisaCategory, AdapterName } from "@/src/core/types";
+
+export interface FeedRow extends JobPosting {
+  score: number | null;
+  score_reasoning: string | null;
+}
+
+export interface FeedFilters {
+  source?: AdapterName;
+  visa_category?: VisaCategory;
+  country?: string;
+  min_score?: number;
+  limit?: number;
+}
+
+export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
+  const db = getDb();
+  const wheres = ["j.archived = 0"];
+  const args: (string | number)[] = [];
+
+  if (filters.source) {
+    wheres.push("j.source = ?");
+    args.push(filters.source);
+  }
+  if (filters.visa_category) {
+    wheres.push("j.visa_category = ?");
+    args.push(filters.visa_category);
+  }
+  if (filters.country) {
+    wheres.push("instr(lower(j.visa_target_countries_json), ?) > 0");
+    args.push(`"${filters.country.toLowerCase()}"`);
+  }
+  if (typeof filters.min_score === "number") {
+    wheres.push("s.value >= ?");
+    args.push(filters.min_score);
+  }
+
+  args.push(filters.limit ?? 200);
+
+  const { rows } = await db.execute({
+    sql: `
+      SELECT j.*, s.value AS score, s.reasoning AS score_reasoning
+      FROM jobs j LEFT JOIN scores s ON s.job_id = j.id
+      WHERE ${wheres.join(" AND ")}
+      ORDER BY (s.value IS NULL), s.value DESC, j.fetched_at DESC
+      LIMIT ?
+    `,
+    args,
+  });
+
+  return rows.map((r) => ({
+    id: r.id as string,
+    source: r.source as JobPosting["source"],
+    external_id: r.external_id as string,
+    url: r.url as string,
+    company: {
+      name: r.company_name as string,
+      domain: (r.company_domain as string | null) ?? undefined,
+      hq_country: (r.company_hq_country as string | null) ?? undefined,
+    },
+    title: r.title as string,
+    location: {
+      remote: Number(r.location_remote) === 1,
+      raw: r.location_raw as string,
+      geo: (r.location_geo as string | null) ?? undefined,
+    },
+    visa: {
+      category: r.visa_category as VisaCategory,
+      target_countries: JSON.parse(
+        (r.visa_target_countries_json as string) || "[]"
+      ),
+    },
+    target_timezone: (r.target_timezone as string | null) ?? undefined,
+    description_md: r.description_md as string,
+    posted_at: r.posted_at as string,
+    raw_ref: (r.raw_ref as string | null) ?? undefined,
+    fetched_at: r.fetched_at as string,
+    score: r.score === null ? null : Number(r.score),
+    score_reasoning: (r.score_reasoning as string | null) ?? null,
+  }));
+}

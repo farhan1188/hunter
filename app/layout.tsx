@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import "./globals.css";
-import { Geist } from "next/font/google";
+import { Inter } from "next/font/google";
 import { cn } from "@/lib/utils";
+import { SiteNav } from "@/components/site-nav";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
+const inter = Inter({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "Job Hunter",
@@ -16,8 +17,11 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="en" className={cn("font-sans", geist.variable)}>
-      <body className="bg-gray-50">{children}</body>
+    <html lang="en" className={cn("font-sans", inter.variable)}>
+      <body className="bg-gray-50">
+        <SiteNav />
+        <div className="mx-auto max-w-6xl px-4 py-6">{children}</div>
+      </body>
     </html>
   );
 }
