@@ -1,6 +1,15 @@
-import { listFeed, type FeedFilters, type FeedRow } from "@/src/core/jobs/query";
+import {
+  listFeed,
+  type FeedFilters,
+  type FeedRow,
+} from "@/src/core/jobs/query";
+import { getProfile, listAdapters, getSettings } from "@/src/profile/store";
+import { staleRoutines } from "@/src/lib/heartbeat";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
+import { FilterBar } from "./filter-bar";
+import { HealthBanner } from "./health-banner";
+import { RunNowButton } from "./run-now-button";
 
 export const dynamic = "force-dynamic";
 
@@ -18,29 +27,69 @@ export default async function FeedPage({
   };
 
   let rows: FeedRow[] = [];
+  let adapters: Awaited<ReturnType<typeof listAdapters>> = [];
+  let stale: string[] = [];
+  let showCountrySpecific = false;
+  let allowedCountries = new Set<string>();
   let dbError: string | null = null;
+
   try {
-    rows = await listFeed(filters);
+    const [feedRows, profile, settings, adapterRows, staleList] = await Promise.all([
+      listFeed(filters),
+      getProfile(),
+      getSettings(),
+      listAdapters(),
+      staleRoutines(),
+    ]);
+    rows = feedRows;
+    adapters = adapterRows;
+    stale = staleList;
+    showCountrySpecific =
+      settings.feed_show_country_specific || Boolean(params.visa_category);
+    allowedCountries = new Set([
+      ...profile.preferences.work_auth_countries,
+      ...profile.preferences.open_to_sponsorship_countries,
+    ]);
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
   }
 
+  const filtered = showCountrySpecific
+    ? rows
+    : rows.filter((r) => {
+        if (r.visa.category !== "country_specific") return true;
+        return r.visa.target_countries.some((c) => allowedCountries.has(c));
+      });
+
   return (
-    <main>
+    <main className="space-y-4">
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Feed</h1>
-        <span className="text-sm text-gray-500">{rows.length} jobs</span>
+        <div className="flex items-center gap-3">
+          <span className="text-sm text-gray-500">{filtered.length} jobs</span>
+          <RunNowButton />
+        </div>
       </div>
 
       {dbError && (
-        <div className="mt-4 rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">
+        <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">
           <strong>Database not configured yet.</strong> Follow{" "}
-          <code>docs/setup.md</code> to set up Turso, then refresh.
+          <code>docs/setup.md</code> to set up Turso.
           <div className="mt-1 text-xs text-gray-600">{dbError}</div>
         </div>
       )}
 
-      <table className="mt-4 w-full text-sm">
+      {!dbError && <HealthBanner adapters={adapters} staleRoutines={stale} />}
+
+      <FilterBar />
+
+      {!showCountrySpecific && rows.length - filtered.length > 0 && (
+        <div className="text-xs text-gray-500">
+          {rows.length - filtered.length} country-specific jobs hidden (toggle in Settings).
+        </div>
+      )}
+
+      <table className="w-full text-sm">
         <thead className="text-left text-gray-500">
           <tr>
             <th className="py-2 w-12">Score</th>
@@ -53,7 +102,7 @@ export default async function FeedPage({
           </tr>
         </thead>
         <tbody>
-          {rows.map((r) => (
+          {filtered.map((r) => (
             <tr key={r.id} className="border-t align-top">
               <td className="py-2 font-mono">{r.score ?? "—"}</td>
               <td>
