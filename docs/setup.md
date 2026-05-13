@@ -2,11 +2,25 @@
 
 ## Turso (one-time)
 
-1. Install the CLI on Windows (PowerShell):
+1. Install the CLI on Windows. Pick one:
 
+   **a) Scoop (easiest):**
    ```powershell
-   irm get.tur.so/install.ps1 | iex
+   scoop install turso
    ```
+
+   **b) WSL (if you have it set up):**
+   ```bash
+   curl -sSfL https://get.tur.so/install.sh | bash
+   ```
+
+   **c) Direct binary download:**
+   Download `turso-cli-windows-amd64.zip` from
+   https://github.com/tursodatabase/turso-cli/releases/latest, unzip somewhere
+   like `C:\Tools\turso\`, then add that folder to your PATH (System Properties →
+   Environment Variables → Path → Edit → New).
+
+   Verify install: `turso --version`
 
 2. Sign up + log in:
 

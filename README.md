@@ -31,7 +31,7 @@ Code routines, covered by your Max subscription.
 
 ## What you need to set up
 
-1. **Install Turso CLI + provision DB** — see [`docs/setup.md`](docs/setup.md)
+1. **Install Turso CLI + provision DB** — see [`docs/setup.md`](docs/setup.md) (no native PowerShell installer; use scoop, WSL, or grab the binary from GitHub releases)
 2. **Copy `.env.example` to `.env`** and fill in:
    - `TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN_FULL`, `TURSO_AUTH_TOKEN_READ`
    - `ANTHROPIC_API_KEY`
