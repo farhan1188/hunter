@@ -14,7 +14,7 @@ export function nowIso(): string {
   return new Date().toISOString();
 }
 
-/** Strip HTML tags, collapse whitespace. */
+/** Strip HTML tags + decode common entities + collapse whitespace. */
 export function stripHtml(html: string): string {
   return html
     .replace(/<[^>]+>/g, " ")
@@ -22,6 +22,11 @@ export function stripHtml(html: string): string {
     .replace(/&amp;/g, "&")
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&apos;/g, "'")
+    .replace(/&#x27;/g, "'")
+    .replace(/&hellip;/g, "...")
     .replace(/\s+/g, " ")
     .trim();
 }

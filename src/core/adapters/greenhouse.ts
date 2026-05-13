@@ -70,7 +70,7 @@ export class GreenhouseAdapter implements Adapter {
           raw: j.location?.name ?? "",
         },
         visa: { category: "unknown" as const, target_countries: [] },
-        description_md: stripHtml(decodeURIComponent(j.content ?? "")),
+        description_md: stripHtml(j.content ?? ""),
         posted_at: j.updated_at,
         fetched_at: nowIso(),
       };
