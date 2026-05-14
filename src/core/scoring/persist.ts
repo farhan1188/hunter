@@ -24,7 +24,11 @@ export async function scoreUnscored(
   profile: Profile
 ): Promise<number> {
   const { rows } = await db.execute(`
-    SELECT j.* FROM jobs j
+    SELECT j.id, j.source, j.external_id, j.url,
+           j.company_name, j.title,
+           j.location_remote, j.location_raw,
+           j.visa_category, j.description_md, j.posted_at, j.fetched_at
+    FROM jobs j
     LEFT JOIN scores s ON s.job_id = j.id
     WHERE s.job_id IS NULL AND j.archived = 0
     ORDER BY j.fetched_at DESC

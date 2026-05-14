@@ -2,13 +2,14 @@
 
 import { useRouter, useSearchParams, usePathname } from "next/navigation";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+
+const VISA_OPTIONS = [
+  { value: "", label: "Any visa category" },
+  { value: "international_remote", label: "International remote" },
+  { value: "sponsorship_offered", label: "Sponsorship offered" },
+  { value: "country_specific", label: "Country-specific" },
+  { value: "unknown", label: "Unknown" },
+];
 
 export function FilterBar() {
   const router = useRouter();
@@ -24,23 +25,17 @@ export function FilterBar() {
 
   return (
     <div className="flex flex-wrap items-center gap-2 rounded border bg-white p-3">
-      <Select
-        value={params.get("visa_category") ?? "any"}
-        onValueChange={(v: string | null) =>
-          update("visa_category", !v || v === "any" ? "" : v)
-        }
+      <select
+        className="h-9 rounded-md border border-input bg-white px-3 text-sm"
+        value={params.get("visa_category") ?? ""}
+        onChange={(e) => update("visa_category", e.target.value)}
       >
-        <SelectTrigger className="w-56">
-          <SelectValue placeholder="Visa category" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="any">Any visa category</SelectItem>
-          <SelectItem value="international_remote">International remote</SelectItem>
-          <SelectItem value="sponsorship_offered">Sponsorship offered</SelectItem>
-          <SelectItem value="country_specific">Country-specific</SelectItem>
-          <SelectItem value="unknown">Unknown</SelectItem>
-        </SelectContent>
-      </Select>
+        {VISA_OPTIONS.map((o) => (
+          <option key={o.value} value={o.value}>
+            {o.label}
+          </option>
+        ))}
+      </select>
 
       <Input
         className="w-36"

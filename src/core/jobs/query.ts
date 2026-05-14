@@ -40,7 +40,12 @@ export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
 
   const { rows } = await db.execute({
     sql: `
-      SELECT j.*, s.value AS score, s.reasoning AS score_reasoning
+      SELECT j.id, j.source, j.external_id, j.url,
+             j.company_name, j.company_domain, j.company_hq_country,
+             j.title, j.location_remote, j.location_raw, j.location_geo,
+             j.visa_category, j.visa_target_countries_json, j.target_timezone,
+             j.description_md, j.posted_at, j.raw_ref, j.fetched_at,
+             s.value AS score, s.reasoning AS score_reasoning
       FROM jobs j LEFT JOIN scores s ON s.job_id = j.id
       WHERE ${wheres.join(" AND ")}
       ORDER BY (s.value IS NULL), s.value DESC, j.fetched_at DESC

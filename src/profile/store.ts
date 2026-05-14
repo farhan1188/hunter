@@ -2,9 +2,13 @@ import { getDb } from "@/src/db/client";
 import type { Profile, Preferences, ResumeStruct } from "@/src/core/types";
 import { PreferencesSchema } from "@/src/core/schemas";
 
+// IMPORTANT: libSQL HTTP returns wrong column values for `SELECT *` — always list columns explicitly.
+const PROFILE_COLS =
+  "id, basics_json, resume_struct_json, preferences_json, resume_filename, resume_uploaded_at, resume_drive_file_id";
+
 export async function getProfile(): Promise<Profile> {
   const { rows } = await getDb().execute(
-    "SELECT * FROM profile WHERE id = 1"
+    `SELECT ${PROFILE_COLS} FROM profile WHERE id = 1`
   );
   const r = rows[0];
   if (!r) throw new Error("profile row missing — migration not applied?");
@@ -73,7 +77,10 @@ export interface AppSettings {
 
 export async function getSettings(): Promise<AppSettings> {
   const { rows } = await getDb().execute(
-    "SELECT * FROM settings WHERE id = 1"
+    `SELECT id, daily_cap, weekly_cap, score_threshold, aggressiveness,
+            token_budget_daily_usd, dry_run, default_target_timezone,
+            cadence_floor_minutes, feed_show_country_specific
+     FROM settings WHERE id = 1`
   );
   const r = rows[0];
   return {
@@ -121,7 +128,9 @@ export interface AdapterRow {
 
 export async function listAdapters(): Promise<AdapterRow[]> {
   const { rows } = await getDb().execute(
-    "SELECT * FROM adapters ORDER BY name"
+    `SELECT name, enabled, config_json, last_run_at, last_success_at,
+            last_error, consecutive_failures
+     FROM adapters ORDER BY name`
   );
   return rows.map((r) => ({
     name: r.name as string,
