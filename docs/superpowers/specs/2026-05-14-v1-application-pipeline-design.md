@@ -97,6 +97,16 @@ CREATE TABLE applications (
 
 CREATE INDEX idx_applications_state ON applications(state, created_at DESC);
 CREATE INDEX idx_applications_channel ON applications(channel, state);
+
+-- Add apply URL + ATS hint to jobs table (for LinkedIn-discovered jobs where the
+-- read URL and the submit URL differ, and where HarvestAPI tells us the ATS upfront).
+ALTER TABLE jobs ADD COLUMN apply_url TEXT;
+   -- For direct-source jobs (greenhouse/lever/ashby/remoteok/etc), == jobs.url.
+   -- For LinkedIn jobs, == applyMethod.companyApplyUrl ?? easyApplyUrl from HarvestAPI.
+ALTER TABLE jobs ADD COLUMN ats_vendor TEXT;
+   -- 'greenhouse' | 'lever' | 'ashby' | 'workday' | 'smartrecruiters' | null
+   -- Populated by HarvestAPI's applicantTrackingSystem field for LinkedIn jobs.
+   -- For direct-source jobs from the named ATS adapters, set to the matching value.
 ```
 
 The existing `applications` table in `001_init.sql` is replaced — it was a stub for Phase 3 that never got populated. Migration handles the upgrade.
@@ -180,14 +190,17 @@ The existing `qa_kb` table is fine structurally — the change is content: we po
 
 **Submission logic per row:**
 
-1. Lookup adapter row by `jobs.source`. Read `submit_mode`.
-2. If `submit_mode = 'off'`: skip.
-3. If `submit_mode = 'click_to_send'`: leave in `ready` for Local Agent / user. (The Local Agent processes both ATS and non-ATS rows when in click-to-send mode for that source.)
-4. If `submit_mode = 'auto_submit'`:
+1. Determine the effective adapter:
+   - For jobs from a direct-source adapter (`source IN ('greenhouse','lever','ashby',…)`): lookup adapter by `jobs.source`.
+   - For LinkedIn-discovered jobs (`source = 'linkedin'`): lookup adapter by `jobs.ats_vendor` (the ATS HarvestAPI reported). If `ats_vendor IS NULL` or not in the ATS-native set, this job is not Tier 1 eligible — leave it for Tier 2 (Local Agent).
+2. Read the effective adapter's `submit_mode`.
+3. If `submit_mode = 'off'`: skip.
+4. If `submit_mode = 'click_to_send'`: leave in `ready` for Local Agent / user. (The Local Agent processes both ATS and non-ATS rows when in click-to-send mode for that source.)
+5. If `submit_mode = 'auto_submit'`:
    - Check global `daily_cap` (count `submitted_at` in last 24h).
    - Check per-source `daily_cap`.
    - Check Poisson cadence — see §8.
-   - If all gates pass: invoke vendor-specific submitter (Greenhouse / Lever / Ashby via Playwright-MCP in routine), capture result, set `state = 'submitted'` and `submitted_at = now()` on success, else `state = 'submit_failed'`.
+   - If all gates pass: invoke vendor-specific submitter (Greenhouse / Lever / Ashby via Playwright-MCP in routine) against `jobs.apply_url` (not `jobs.url`), capture result, set `state = 'submitted'` and `submitted_at = now()` on success, else `state = 'submit_failed'`.
 
 **Q&A KB integration:** before any submission, check the form's questions (extracted by Playwright) against `qa_kb` deny-list. Any deny-list match → halt this submission, set `state = 'quality_review'` with reason "needs Q&A review", attach the offending question.
 
@@ -248,29 +261,67 @@ A button on every application card: "Draft LinkedIn DM." Calls `POST /api/outrea
 
 **Cadence:** daily (cron `0 6 * * *` — 06:00 UTC = 11:00 PKT).
 
-**Mechanism:** Apify is a third-party scraping platform. We register at `apify.com`, pick a no-cookies LinkedIn Jobs actor (current candidate: FetchClub's "LinkedIn Jobs & Company Scraper"), get an API token, and call it from a new routine. Apify runs the scrape on its own infrastructure with its own LinkedIn-facing infrastructure — our personal LinkedIn account is untouched.
+**Mechanism:** Apify is a third-party scraping platform. The actor we use is **HarvestAPI's "Advanced LinkedIn Job Scraper (No Cookies)"** — slug `harvestapi/linkedin-job-search`, console actor id `zn01OAlzP853oqn4Z`. Verified live on 2026-05-14: 20 jobs returned from a US+UK Senior PM search, all 20 had full JD text, 19/20 had a working external apply URL. Apify runs the scrape on its own infrastructure with its own LinkedIn-facing accounts — our personal LinkedIn account is untouched.
 
-**Cost:** at our volume (1,500–3,000 jobs/month), pay-per-result stays inside Apify's $5/month free credit tier — effective cost $0. If we ever exceed it, monthly rental of the actor is ~$20/mo. Routine logs Apify credit usage in `routine_runs.stats_json` so we can see if we're approaching the cap.
+**Cost (verified):** 20 jobs = $0.04 total ($0.02 platform compute + ~$0.02 HarvestAPI pay-per-event at $1/1k). Projected for 1,500–3,000 jobs/month: $3–6/month, fully covered by Apify's $5/month free credit tier. Routine logs Apify credit usage in `routine_runs.stats_json` so we can see if we're approaching the cap.
 
-**Inputs:** profile `target_roles` + `work_auth_countries ∪ open_to_sponsorship_countries` (translated to LinkedIn location filters) + `target_employment_types` from settings (default: full-time + contract).
+**Inputs:** profile `target_roles` (mapped to actor field `jobTitles`) + `work_auth_countries ∪ open_to_sponsorship_countries` (mapped to `locations` as ISO-3166 country names that LinkedIn's autocomplete accepts) + `target_employment_types` from settings if set. Recommended actor params: `maxItems: 25 per location`, `sortBy: "date"`, `easyApply: false` (we want both Easy Apply and external — leaving the flag off returns both).
 
-**Outputs per run:** ~25–50 LinkedIn job records with `{title, company, location, jd_text, posted_at, apply_url}`.
+**Output schema (verified):** each item is a flat object with the following fields we care about:
+
+```ts
+type HarvestApiJob = {
+  id: string;                    // LinkedIn numeric ID
+  title: string;
+  linkedinUrl: string;           // canonical "https://www.linkedin.com/jobs/view/<id>/"
+  jobState: 'LISTED' | string;
+  postedDate: string;            // ISO
+  descriptionText: string;       // full JD plain text
+  descriptionHtml: string;
+  location: {
+    linkedinText: string;        // "London, England, United Kingdom"
+    countryCode: string;         // "us" / "gb" / ...
+    postalAddress: string | null;
+  };
+  workplaceType: 'remote' | 'hybrid' | 'on_site' | null;
+  workRemoteAllowed: boolean;
+  employmentType: string | null;
+  experienceLevel: string | null;
+  easyApplyUrl: string | null;   // set when LinkedIn Easy Apply is enabled
+  applyMethod: {
+    companyApplyUrl: string | null;  // external apply URL (job board / company careers / ATS)
+  };
+  company: { name: string; /* + other fields */ };
+  applicantTrackingSystem: 'Greenhouse' | 'Lever' | 'Ashby' | 'Workday' | 'SMART_RECRUITERS' | 'LinkedIn' | string | null;
+  salary: unknown | null;
+  industries: string[];
+  jobFunctions: string[];
+  // ...other fields not used in v1
+};
+```
+
+The `applicantTrackingSystem` field is the goldmine — we use it to route jobs directly to the right submitter channel without URL-pattern probing.
 
 **Steps:**
 1. Read profile + settings to build the search query.
-2. POST to `https://api.apify.com/v2/acts/<actor-id>/run-sync-get-dataset-items?token=<token>` with the search inputs and `rows: 50`. Synchronous run, returns dataset JSON.
-3. For each item: compute `external_id = sha256('linkedin::' + item.id).slice(0,16)`. INSERT OR IGNORE into `jobs` with `source = 'linkedin'`, `apply_url = item.apply_url` (this is what the Local Agent will hit during submission; sometimes LinkedIn Easy Apply, sometimes external).
-4. For each newly inserted job: run archetype + visa + scoring (reuse existing classifiers).
-5. For qualified jobs: create `applications` row in `qualified`. Tailor routine picks them up.
-6. Log to `routine_runs` with `{fetched, inserted, qualified, apify_credits_used}`.
+2. POST to `https://api.apify.com/v2/acts/zn01OAlzP853oqn4Z/run-sync-get-dataset-items?token=<token>` with the input payload and `maxItems: 25 per location`. Synchronous run (~30s for 25-50 items), returns dataset JSON array.
+3. For each item: compute `external_id = sha256('linkedin::' + item.id).slice(0,16)`. INSERT OR IGNORE into `jobs` with `source = 'linkedin'`, `url = item.linkedinUrl`. Persist `apply_url = item.applyMethod.companyApplyUrl ?? item.easyApplyUrl`, `ats_vendor = normalizeAts(item.applicantTrackingSystem)` (mapping function: 'Greenhouse' → 'greenhouse', 'Lever' → 'lever', 'Ashby' → 'ashby'; everything else → null), plus location/posted_at as usual.
+4. For each newly inserted job: run archetype + visa + scoring (reuse existing classifiers; visa classifier can use `location.countryCode` as a strong prior).
+5. For qualified jobs: create `applications` row in `qualified`. If `ats_vendor` is 'greenhouse' | 'lever' | 'ashby' AND that adapter's `submit_mode = 'auto_submit'`, the Submit routine (§6.2) will pick it up as Tier 1 — using `apply_url` (the companyApplyUrl, not the LinkedIn URL) as the submit target. Otherwise the application goes to Tier 2 via the Local Agent.
+6. Log to `routine_runs` with `{fetched, inserted, qualified, by_ats: {greenhouse: N, lever: N, ...}, apify_credits_used}`.
 
-**Failure handling:** if Apify API is down or out of credits, log + skip; don't crash. Other discovery streams (existing adapters, aggregators §6.8, paste-URL) keep flowing.
+**ATS routing rule:** because HarvestAPI tells us the ATS, the existing Greenhouse/Lever/Ashby adapters (which require hand-curated company slugs) become **opt-in supplementary discovery**, not the primary path. The slug pre-list is only needed for companies that post directly to their ATS board but aren't surfaced on LinkedIn — relatively rare for serious roles.
+
+**Failure handling:** if the Apify API is down or out of credits, log + skip; don't crash. Other discovery streams (existing adapters, aggregators §6.8, paste-URL) keep flowing. If HarvestAPI specifically breaks (e.g. LinkedIn detects its scraping pattern and degrades it), fallback actor candidates documented for Stage 2: `memo23/apify-linkedin-search-results-scraper` (also no-cookies, lower volume).
 
 **Config additions:**
-- `.env` adds `APIFY_API_TOKEN`.
-- `adapters` gets a new row with `name = 'linkedin'`, `ats_vendor = null`, `config_json = {actor_id, rows_per_run, additional_filters}`.
+- `.env` adds `APIFY_API_TOKEN` (Apify Console → Settings → Integrations).
+- `adapters` gets a new row with `name = 'linkedin'`, `ats_vendor = null`, `config_json = { actor_id: 'zn01OAlzP853oqn4Z', max_items_per_location: 25, sort_by: 'date' }`.
+- The Authorize-actor permission grant is a one-time interactive step on first run; documented in setup checklist.
 
 ### 6.8 Aggregator adapters — Wellfound, Otta, BuiltIn (new)
+
+These complement HarvestAPI (§6.7) by covering companies that *aren't* on LinkedIn — smaller startups (Wellfound), Europe-only job boards (Otta), and regional US tech boards (BuiltIn). LinkedIn coverage is broad but not exhaustive; for companies LinkedIn doesn't index well, these adapters are the input pipe.
 
 Three new adapter implementations under `src/core/adapters/`, each conforming to the existing `Adapter` interface. They are sources of jobs, not company directories; in the system's view they're the same shape as RemoteOK or Greenhouse.
 
@@ -281,6 +332,8 @@ Three new adapter implementations under `src/core/adapters/`, each conforming to
 For each: implementation follows the existing adapter pattern (deterministic URL → fetch → parse → `JobPosting[]`), registered in `src/core/adapters/registry.ts`, exposed in Settings UI, enabled by user via per-source `enabled` toggle.
 
 If any aggregator turns out to require a paid API or an account login, we skip that one for v1 and document the omission.
+
+**Existing Greenhouse/Lever/Ashby adapters (config-based):** these continue to work for hand-curated company slugs. With HarvestAPI now providing ATS detection on LinkedIn-found jobs (§6.7), the manual slug curation becomes optional and supplementary — only worth maintaining for companies that post directly to their ATS but aren't indexed on LinkedIn.
 
 ## 7. Quality gates
 
@@ -395,5 +448,6 @@ Listed in §2. Worth re-reading before starting any stage to avoid scope drift.
 1. **Typst install** — does Typst need to be installed on the Anthropic routine machine for the Tailor routine to render PDFs? Likely yes; will need to verify and document. Fallback: render via a `typst` Docker image or shell to a JS-based PDF library if Typst install proves painful in routines.
 2. **Drive write before Turso** — per `architecture_decisions.md`, Drive write must succeed before the `applications` row is updated with the path. Reconciler already cleans orphan Drive files nightly; verify it handles `applications.resume_pdf_path` too.
 3. **Token scoping** — Tailor routine needs write on `applications`, Submit routine needs write on `applications` + read on `qa_kb`. Add to `docs/turso-tokens.md` during Stage 1.
-4. **Apify actor choice** — pick a no-cookies actor at Stage 2 implementation time. FetchClub's "LinkedIn Jobs & Company Scraper" is the current candidate; verify it still exists and meets our needs (returns JD text, not just metadata). Document fallback actors if the primary breaks.
+4. **Apify actor choice** — resolved 2026-05-14: HarvestAPI's `harvestapi/linkedin-job-search` (console id `zn01OAlzP853oqn4Z`). Verified with a live 20-job test; schema includes `applicantTrackingSystem` which simplifies Tier-1 routing. Fallback: `memo23/apify-linkedin-search-results-scraper`.
 5. **Aggregator scraping robustness** — Wellfound / Otta / BuiltIn may change their page structure or add anti-bot measures. Each adapter should fail soft (existing auto-disable-after-3-failures path) and be straightforward to fix when broken.
+6. **HarvestAPI search precision** — public reviews mention LinkedIn's own fuzzy search returning adjacent roles for niche queries (e.g. "crypto backend"). Standard titles ("Senior Product Manager", "Solutions Engineer") tested clean. If we add niche titles to `target_roles` later, expect downstream archetype filter to do more work.
