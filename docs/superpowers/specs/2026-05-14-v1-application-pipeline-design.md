@@ -23,7 +23,8 @@ These were considered and explicitly deferred:
 - Per-region timezone routing — single target timezone per user is sufficient.
 - Application analytics / funnel dashboards — defer until ≥50 submissions exist worth analyzing.
 - Per-archetype autonomy dials — per-source dial is enough; per-archetype adds knobs without clear payoff.
-- LinkedIn job-search scraping — only the Saved-Jobs ingester (user-curated) is in scope. No automated search-result harvesting.
+- **In-browser LinkedIn scraping (Local Agent doing LinkedIn search or Saved-Jobs ingestion).** All LinkedIn discovery in v1 goes through a third-party API (Apify, see §6.7) that does the scraping on its own infrastructure with its own accounts — your personal LinkedIn account is never touched by automation. The Local Agent does **not** open LinkedIn for any purpose.
+- Gmail LinkedIn-alert parsing — considered, declined in favor of Apify giving us controlled queries instead of LinkedIn's algorithmic email choices.
 
 ## 3. Core concept: application as atomic unit
 
@@ -194,29 +195,15 @@ The existing `qa_kb` table is fine structurally — the change is content: we po
 
 Lives at `agent/` in the repo. A separate Node.js process the user runs manually (`npm run agent`). Connects via CDP to the user's already-running Chrome (preferred — lowest detection risk) or falls back to a persistent Playwright context using the user's Chrome profile directory.
 
-**Two modes:**
+**Mode: Submit only.**
 
-#### 6.3.1 Submit mode
 Pulls next `state = 'ready'` row that's either:
 - ATS-native with `submit_mode = 'click_to_send'`, or
-- Non-ATS (any source).
+- Non-ATS (any source — generic career pages, Workday with existing browser session, LinkedIn Easy Apply when the Apify-ingested job's `apply_url` is on LinkedIn itself).
 
 Opens the job URL, fills the form (resume PDF upload, cover letter paste, name/email/etc from profile), answers safe Q&A KB questions automatically, **stops at the Submit button**. Local UI shows the filled form + a big "Submit" button the user clicks. On click, marks `state = 'submitted'`.
 
-#### 6.3.2 LinkedIn Saved-Jobs ingester mode
-User-triggered (button in Hub or `npm run agent -- ingest-linkedin`). Connects to user's running Chrome → LinkedIn → My Items → Saved Jobs. Pulls top 25 saved jobs. For each:
-
-- Extract `{title, company, location, jd_text, posted_at, apply_url}`.
-- Create `jobs` row with `source = 'linkedin_saved'`.
-- Trigger archetype + visa + scoring in-process (reuses existing classifiers).
-- If qualified: create `applications` row in `qualified` so the Tailor routine picks it up.
-
-**Anti-ban precautions:**
-- CDP-connect to existing Chrome session, don't launch fresh
-- Realistic dwell (3–8s per job page)
-- User-triggered only, no schedule
-- Cap of 25/run, max 2 runs/day enforced by `routine_runs` table check
-- No pagination beyond first page
+The Local Agent does **not** do any LinkedIn search, scraping, or Saved-Jobs ingestion. LinkedIn discovery is handled exclusively by §6.7 (Apify routine). LinkedIn Easy Apply *submission* is the one place Local Agent touches LinkedIn, and only on jobs Apify or paste-URL already ingested.
 
 ### 6.4 Q&A KB + hardcoded deny-list (new content, table exists)
 
@@ -256,6 +243,44 @@ A button on every application card: "Draft LinkedIn DM." Calls `POST /api/outrea
 1. Identifies hiring manager / recruiter candidates from the JD text (if mentioned) or returns a placeholder `{target_name: "Hiring Manager"}`.
 2. Generates a ~80-word DM draft with Haiku, attached to the application card.
 3. User clicks "Copy"; tool stamps `copied_at`. Never sends.
+
+### 6.7 LinkedIn discovery via Apify routine (new)
+
+**Cadence:** daily (cron `0 6 * * *` — 06:00 UTC = 11:00 PKT).
+
+**Mechanism:** Apify is a third-party scraping platform. We register at `apify.com`, pick a no-cookies LinkedIn Jobs actor (current candidate: FetchClub's "LinkedIn Jobs & Company Scraper"), get an API token, and call it from a new routine. Apify runs the scrape on its own infrastructure with its own LinkedIn-facing infrastructure — our personal LinkedIn account is untouched.
+
+**Cost:** at our volume (1,500–3,000 jobs/month), pay-per-result stays inside Apify's $5/month free credit tier — effective cost $0. If we ever exceed it, monthly rental of the actor is ~$20/mo. Routine logs Apify credit usage in `routine_runs.stats_json` so we can see if we're approaching the cap.
+
+**Inputs:** profile `target_roles` + `work_auth_countries ∪ open_to_sponsorship_countries` (translated to LinkedIn location filters) + `target_employment_types` from settings (default: full-time + contract).
+
+**Outputs per run:** ~25–50 LinkedIn job records with `{title, company, location, jd_text, posted_at, apply_url}`.
+
+**Steps:**
+1. Read profile + settings to build the search query.
+2. POST to `https://api.apify.com/v2/acts/<actor-id>/run-sync-get-dataset-items?token=<token>` with the search inputs and `rows: 50`. Synchronous run, returns dataset JSON.
+3. For each item: compute `external_id = sha256('linkedin::' + item.id).slice(0,16)`. INSERT OR IGNORE into `jobs` with `source = 'linkedin'`, `apply_url = item.apply_url` (this is what the Local Agent will hit during submission; sometimes LinkedIn Easy Apply, sometimes external).
+4. For each newly inserted job: run archetype + visa + scoring (reuse existing classifiers).
+5. For qualified jobs: create `applications` row in `qualified`. Tailor routine picks them up.
+6. Log to `routine_runs` with `{fetched, inserted, qualified, apify_credits_used}`.
+
+**Failure handling:** if Apify API is down or out of credits, log + skip; don't crash. Other discovery streams (existing adapters, aggregators §6.8, paste-URL) keep flowing.
+
+**Config additions:**
+- `.env` adds `APIFY_API_TOKEN`.
+- `adapters` gets a new row with `name = 'linkedin'`, `ats_vendor = null`, `config_json = {actor_id, rows_per_run, additional_filters}`.
+
+### 6.8 Aggregator adapters — Wellfound, Otta, BuiltIn (new)
+
+Three new adapter implementations under `src/core/adapters/`, each conforming to the existing `Adapter` interface. They are sources of jobs, not company directories; in the system's view they're the same shape as RemoteOK or Greenhouse.
+
+- **Wellfound** (formerly AngelList Talent) — `src/core/adapters/wellfound.ts`. Source: their public API or job-listing pages. Focus: startups, US-heavy with some EU. Many roles offer relocation/sponsorship.
+- **Otta / Welcome to the Jungle** — `src/core/adapters/otta.ts`. Source: public job-listing pages. Focus: Europe + UK; many companies that sponsor.
+- **BuiltIn** — `src/core/adapters/builtin.ts`. Source: public listings + RSS where available. Focus: US tech hubs.
+
+For each: implementation follows the existing adapter pattern (deterministic URL → fetch → parse → `JobPosting[]`), registered in `src/core/adapters/registry.ts`, exposed in Settings UI, enabled by user via per-source `enabled` toggle.
+
+If any aggregator turns out to require a paid API or an account login, we skip that one for v1 and document the omission.
 
 ## 7. Quality gates
 
@@ -334,7 +359,8 @@ Pragmatic; the goal is shippable not gold-plated. Per `feedback_trim_ceremony.md
 - End-to-end one application: enable one Greenhouse adapter, fix a known job, run Tailor routine, verify Drive PDF + cover letter, verify state moves to `ready`.
 - Tier 1 dry: flip Greenhouse to `auto_submit` on a test board (one of the public ones), let it run, confirm submission.
 - Tier 2: launch Local Agent in submit mode on a `ready` Lever job, confirm form is filled, abort before clicking Submit.
-- LinkedIn Saved-Jobs ingester: save 3 jobs on LinkedIn manually, run agent ingest, confirm `applications` rows land.
+- Apify routine: run once with a known set of target_roles, confirm ~25 LinkedIn jobs ingest and at least some end up qualified.
+- Aggregator adapters: per-adapter unit test on a real fetched page snapshot (Wellfound / Otta / BuiltIn), confirms the parser produces valid `JobPosting` objects.
 
 No coverage thresholds. The submission paths get manual verification per the spec's checkpoint at Stage 6.
 
@@ -343,17 +369,18 @@ No coverage thresholds. The submission paths get manual verification per the spe
 | # | Stage | Deliverable | Approx. effort |
 |---|---|---|---|
 | 1 | DB migration | `004_application_pipeline.sql` — new `applications` table, alterations to `adapters` and `settings`, `005_qa_deny_list.sql` for KB seed | 0.5d |
-| 2 | Tailoring engine | Typst renderer + cover letter generator + numerics + claim-equiv + verbatim phrase + Tailor routine prompt | 4–5d |
-| 3 | Pipeline UI | `/pipeline` page with 4 columns + application detail tabs + paste-URL input | 2–3d |
-| 4 | Settings UI | Per-adapter dial table + paused toggle | 1d |
-| 5 | Q&A KB + deny-list | Migration content + matcher utility + UI for adding non-sensitive answers from review tray | 1d |
-| 6 | Submit routine — Greenhouse | Playwright-MCP routine + cadence governor + caps | 2–3d |
+| 2 | Discovery expansion | Apify routine for LinkedIn (§6.7) + Wellfound + Otta + BuiltIn aggregator adapters (§6.8). Independent of pipeline work; runs in parallel with #3. | 2–3d |
+| 3 | Tailoring engine | Typst renderer + cover letter generator + numerics + claim-equiv + verbatim phrase + Tailor routine prompt | 4–5d |
+| 4 | Pipeline UI | `/pipeline` page with 4 columns + application detail tabs + paste-URL input | 2–3d |
+| 5 | Settings UI | Per-adapter dial table + paused toggle + Apify token + watched-companies later if needed | 1d |
+| 6 | Q&A KB + deny-list | Migration content + matcher utility + UI for adding non-sensitive answers from review tray | 1d |
+| 7 | Submit routine — Greenhouse | Playwright-MCP routine + cadence governor + caps | 2–3d |
 | | **CHECKPOINT — review first auto-submissions before continuing** | | |
-| 7 | Local Agent | `agent/` project; submit mode + LinkedIn Saved-Jobs ingester | 3–4d |
-| 8 | ATS expansion | Lever + Ashby submitters | 2d |
-| 9 | Outreach drafter | Endpoint + UI button | 1d |
+| 8 | Local Agent | `agent/` project; submit-only mode (no LinkedIn scraping) | 2–3d |
+| 9 | ATS expansion | Lever + Ashby submitters | 2d |
+| 10 | Outreach drafter | Endpoint + UI button | 1d |
 
-**Total estimated effort:** ~17–22 person-days. Realistic across evenings/weekends: 4–6 weeks.
+**Total estimated effort:** ~19–25 person-days. Realistic across evenings/weekends: 4–7 weeks.
 
 The checkpoint at Stage 6 is non-negotiable. The cost of a single bad-quality auto-submission is asymmetric (recruiter blacklist; permanent reputation damage), so we eyeball the first ~5–10 submissions manually before flipping more switches.
 
@@ -368,4 +395,5 @@ Listed in §2. Worth re-reading before starting any stage to avoid scope drift.
 1. **Typst install** — does Typst need to be installed on the Anthropic routine machine for the Tailor routine to render PDFs? Likely yes; will need to verify and document. Fallback: render via a `typst` Docker image or shell to a JS-based PDF library if Typst install proves painful in routines.
 2. **Drive write before Turso** — per `architecture_decisions.md`, Drive write must succeed before the `applications` row is updated with the path. Reconciler already cleans orphan Drive files nightly; verify it handles `applications.resume_pdf_path` too.
 3. **Token scoping** — Tailor routine needs write on `applications`, Submit routine needs write on `applications` + read on `qa_kb`. Add to `docs/turso-tokens.md` during Stage 1.
-4. **LinkedIn detection** — if the Saved-Jobs ingester triggers a CAPTCHA / restriction, we want a clear failure mode (agent surfaces it, no state change). Test this with an intentional aggressive run early in Stage 7.
+4. **Apify actor choice** — pick a no-cookies actor at Stage 2 implementation time. FetchClub's "LinkedIn Jobs & Company Scraper" is the current candidate; verify it still exists and meets our needs (returns JD text, not just metadata). Document fallback actors if the primary breaks.
+5. **Aggregator scraping robustness** — Wellfound / Otta / BuiltIn may change their page structure or add anti-bot measures. Each adapter should fail soft (existing auto-disable-after-3-failures path) and be straightforward to fix when broken.
