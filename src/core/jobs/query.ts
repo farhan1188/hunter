@@ -4,6 +4,8 @@ import type { JobPosting, VisaCategory, AdapterName } from "@/src/core/types";
 export interface FeedRow extends JobPosting {
   score: number | null;
   score_reasoning: string | null;
+  status: "open" | "closed";
+  last_seen_at: string;
 }
 
 export interface FeedFilters {
@@ -11,6 +13,7 @@ export interface FeedFilters {
   visa_category?: VisaCategory;
   country?: string;
   min_score?: number;
+  include_closed?: boolean;
   limit?: number;
 }
 
@@ -19,6 +22,9 @@ export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
   const wheres = ["j.archived = 0"];
   const args: (string | number)[] = [];
 
+  if (!filters.include_closed) {
+    wheres.push("j.status = 'open'");
+  }
   if (filters.source) {
     wheres.push("j.source = ?");
     args.push(filters.source);
@@ -45,6 +51,7 @@ export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
              j.title, j.location_remote, j.location_raw, j.location_geo,
              j.visa_category, j.visa_target_countries_json, j.target_timezone,
              j.description_md, j.posted_at, j.raw_ref, j.fetched_at,
+             j.last_seen_at, j.status,
              s.value AS score, s.reasoning AS score_reasoning
       FROM jobs j LEFT JOIN scores s ON s.job_id = j.id
       WHERE ${wheres.join(" AND ")}
@@ -83,5 +90,7 @@ export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
     fetched_at: r.fetched_at as string,
     score: r.score === null ? null : Number(r.score),
     score_reasoning: (r.score_reasoning as string | null) ?? null,
+    status: (r.status as "open" | "closed") ?? "open",
+    last_seen_at: (r.last_seen_at as string) ?? (r.fetched_at as string),
   }));
 }

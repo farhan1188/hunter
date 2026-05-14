@@ -24,6 +24,7 @@ export default async function FeedPage({
     visa_category: params.visa_category as FeedFilters["visa_category"],
     country: params.country || undefined,
     min_score: params.min_score ? Number(params.min_score) : undefined,
+    include_closed: params.include_closed === "1",
   };
 
   let rows: FeedRow[] = [];
@@ -89,6 +90,18 @@ export default async function FeedPage({
         </div>
       )}
 
+      <div className="text-xs text-gray-500">
+        {filters.include_closed ? (
+          <a href="/feed" className="text-blue-600 hover:underline">
+            hide closed jobs
+          </a>
+        ) : (
+          <a href="/feed?include_closed=1" className="text-blue-600 hover:underline">
+            show closed jobs
+          </a>
+        )}
+      </div>
+
       <table className="w-full text-sm">
         <thead className="text-left text-gray-500">
           <tr>
@@ -103,10 +116,18 @@ export default async function FeedPage({
         </thead>
         <tbody>
           {filtered.map((r) => (
-            <tr key={r.id} className="border-t align-top">
+            <tr
+              key={r.id}
+              className={`border-t align-top ${r.status === "closed" ? "opacity-50" : ""}`}
+            >
               <td className="py-2 font-mono">{r.score ?? "—"}</td>
               <td>
-                <div>{r.title}</div>
+                <div className="flex items-center gap-2">
+                  <span>{r.title}</span>
+                  {r.status === "closed" && (
+                    <Badge variant="secondary" className="text-xs">closed</Badge>
+                  )}
+                </div>
                 {r.score_reasoning && (
                   <div className="mt-1 text-xs text-gray-500">
                     {r.score_reasoning}
