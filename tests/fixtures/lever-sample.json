@@ -1,0 +1,25 @@
+[
+  {
+    "id": "33538a2f-d27d-4a96-8f05-fa4b0e4d940e",
+    "text": "Senior Backend Engineer",
+    "hostedUrl": "https://jobs.lever.co/exampleco/33538a2f-d27d-4a96-8f05-fa4b0e4d940e",
+    "applyUrl": "https://jobs.lever.co/exampleco/33538a2f-d27d-4a96-8f05-fa4b0e4d940e/apply",
+    "createdAt": 1714521600000,
+    "categories": {
+      "commitment": "Regular Full Time",
+      "department": "Engineering",
+      "team": "Backend",
+      "location": "Remote",
+      "allLocations": ["Remote"]
+    },
+    "country": "US",
+    "workplaceType": "remote",
+    "descriptionPlain": "Build distributed systems in Go.",
+    "description": "<p>Build distributed systems in Go.</p>",
+    "additional": "<p>Equal opportunity employer.</p>",
+    "additionalPlain": "Equal opportunity employer.",
+    "lists": [
+      { "text": "Requirements", "content": "<li>5+ years Go</li>" }
+    ]
+  }
+]

@@ -1,0 +1,22 @@
+{
+  "jobs": [
+    {
+      "id": "7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+      "title": "Engineering Manager, EU",
+      "department": "Engineering",
+      "team": "EMEA Engineering",
+      "employmentType": "FullTime",
+      "location": "Remote - European Union",
+      "secondaryLocations": [
+        { "location": "Romania" },
+        { "location": "Switzerland" }
+      ],
+      "descriptionPlain": "Lead a team of engineers across Europe.",
+      "descriptionHtml": "<p>Lead a team of engineers across Europe.</p>",
+      "jobUrl": "https://jobs.ashbyhq.com/exampleco/7458d4e9-da2e-47bd-98cb-adfda43d42b2",
+      "applyUrl": "https://jobs.ashbyhq.com/exampleco/7458d4e9-da2e-47bd-98cb-adfda43d42b2/application",
+      "isRemote": true,
+      "publishedAt": "2026-05-10T10:00:00.000Z"
+    }
+  ]
+}

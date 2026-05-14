@@ -1,0 +1,18 @@
+{
+  "jobs": [
+    {
+      "id": "143814",
+      "url": "https://jobicy.com/jobs/143814-senior-engineer",
+      "jobSlug": "143814-senior-engineer",
+      "jobTitle": "Senior Engineer",
+      "companyName": "ExampleCo",
+      "jobIndustry": "['Engineering']",
+      "jobType": "['Full-Time']",
+      "jobGeo": "Worldwide",
+      "jobLevel": "Senior",
+      "jobExcerpt": "Build cool things.",
+      "jobDescription": "<p>Build cool things in TypeScript.</p>",
+      "pubDate": "2026-05-13T17:50:33+00:00"
+    }
+  ]
+}

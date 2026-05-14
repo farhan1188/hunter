@@ -56,33 +56,40 @@ export const ResumeBulletSchema = z.object({
   numbers: z.array(z.string()),
 });
 
+// Sonnet may return null for missing optional fields (e.g. `end: null` for current jobs).
+// `.nullish()` accepts string | null | undefined and we normalize null → undefined elsewhere.
+const NullishString = z
+  .string()
+  .nullish()
+  .transform((v) => v ?? undefined);
+
 export const ResumeStructSchema = z.object({
   experience: z.array(
     z.object({
       company: z.string(),
       title: z.string(),
       start: z.string(),
-      end: z.string().optional(),
-      bullets: z.array(ResumeBulletSchema),
+      end: NullishString,
+      bullets: z.array(ResumeBulletSchema).default([]),
     })
-  ),
+  ).default([]),
   projects: z.array(
     z.object({
       name: z.string(),
-      bullets: z.array(ResumeBulletSchema),
+      bullets: z.array(ResumeBulletSchema).default([]),
     })
-  ),
+  ).default([]),
   skills: z.object({
-    primary: z.array(z.string()),
-    secondary: z.array(z.string()),
-  }),
+    primary: z.array(z.string()).default([]),
+    secondary: z.array(z.string()).default([]),
+  }).default({ primary: [], secondary: [] }),
   education: z.array(
     z.object({
       school: z.string(),
       degree: z.string(),
       year: z.string(),
     })
-  ),
+  ).default([]),
 });
 
 export const PreferencesSchema = z.object({

@@ -1,0 +1,16 @@
+{
+  "jobs": [
+    {
+      "title": "Senior Backend Engineer",
+      "excerpt": "Build distributed systems in Go.",
+      "companyName": "ExampleCo",
+      "companySlug": "exampleco",
+      "employmentType": "Full Time",
+      "locationRestrictions": "['Worldwide']",
+      "description": "<p>Build distributed systems in Go.</p>",
+      "pubDate": "1714521600",
+      "applicationLink": "https://himalayas.app/companies/exampleco/jobs/senior-backend-engineer",
+      "guid": "https://himalayas.app/companies/exampleco/jobs/senior-backend-engineer"
+    }
+  ]
+}
