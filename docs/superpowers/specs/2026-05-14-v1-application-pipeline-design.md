@@ -21,7 +21,7 @@ These were considered and explicitly deferred:
 - Workday SSO automation — Local Agent handles Workday via your existing authenticated browser session; no separate SSO handling.
 - LinkedIn DM auto-send — drafts only, copy-paste workflow forever. (Architecture decision; ban-risk too high.)
 - Per-region timezone routing — single target timezone per user is sufficient.
-- Application analytics / funnel dashboards — defer until ≥50 submissions exist worth analyzing.
+- ~~Application analytics / funnel dashboards~~ — basic pipeline-counts dashboard reinstated, see §9.5. Hunt-outcome tracking (responses / interviews / offers) and per-source quality metrics remain deferred until ≥50 submissions exist.
 - Per-archetype autonomy dials — per-source dial is enough; per-archetype adds knobs without clear payoff.
 - **In-browser LinkedIn scraping (Local Agent doing LinkedIn search or Saved-Jobs ingestion).** All LinkedIn discovery in v1 goes through a third-party API (Apify, see §6.7) that does the scraping on its own infrastructure with its own accounts — your personal LinkedIn account is never touched by automation. The Local Agent does **not** open LinkedIn for any purpose.
 - Gmail LinkedIn-alert parsing — considered, declined in favor of Apify giving us controlled queries instead of LinkedIn's algorithmic email choices.
@@ -383,6 +383,26 @@ Each row has dropdown selectors. Plus a global "Submission paused" toggle promin
 ### 9.4 Feed page (kept, demoted)
 Existing feed page stays as `/feed` for "raw input" inspection — what came in from each adapter regardless of qualification. Linked from the Pipeline page header as "View raw feed."
 
+### 9.5 Dashboard page (new, lean)
+
+`/dashboard` — a single page surfacing pipeline health. All counts derive from the existing `applications`, `jobs`, and `routine_runs` tables; no new schema. Page is server-rendered (Next.js RSC), no client-side charting library — just plain HTML/CSS with simple text bars where useful.
+
+**Top strip — today (last 24h):**
+- Jobs ingested (count from `jobs.fetched_at >= now() - 24h`)
+- Applications created (count from `applications.created_at >= now() - 24h`)
+- Ready to send (current count where `state = 'ready'`)
+- Submitted today (count from `applications.submitted_at >= now() - 24h`)
+- Needs review (current count where `state = 'quality_review'`)
+
+**Middle — funnel:** a table or bar list showing current counts in each state:
+`discovered → qualified → tailoring → quality_review → ready → submitted` plus terminal states `submit_failed`, `closed`, `dismissed`. One row per state with count + percentage of total non-terminal applications.
+
+**Bottom — 7-day trend:** a small table (date × jobs_ingested, applications_created, submitted). No fancy chart; readable as a table works fine for 7 rows.
+
+**Footer — routine health (existing, repurposed):** last run + status for ingest, tailor, submit, backup routines. Pulled from `routine_runs` (already populated). This consolidates the staleness banner that lives on `/feed` today.
+
+The dashboard is linked from the global site nav and becomes the default landing page (`/`) — Pipeline is one click away. Rationale: opening the tool, you want context first ("did the overnight routines run? how much shipped?"), then you go act on `Ready` / `Needs review`.
+
 ## 10. Error handling
 
 - **Adapter fetch failure** — existing behavior unchanged (per-adapter failure log + auto-disable after 3 consecutive).
@@ -425,6 +445,7 @@ No coverage thresholds. The submission paths get manual verification per the spe
 | 2 | Discovery expansion | Apify routine for LinkedIn (§6.7) + Wellfound + Otta + BuiltIn aggregator adapters (§6.8). Independent of pipeline work; runs in parallel with #3. | 2–3d |
 | 3 | Tailoring engine | Typst renderer + cover letter generator + numerics + claim-equiv + verbatim phrase + Tailor routine prompt | 4–5d |
 | 4 | Pipeline UI | `/pipeline` page with 4 columns + application detail tabs + paste-URL input | 2–3d |
+| 4b | Dashboard page | `/dashboard` (§9.5) — today's counts + funnel + 7-day trend + routine health. No new schema. Set as default landing page. | 0.5d |
 | 5 | Settings UI | Per-adapter dial table + paused toggle + Apify token + watched-companies later if needed | 1d |
 | 6 | Q&A KB + deny-list | Migration content + matcher utility + UI for adding non-sensitive answers from review tray | 1d |
 | 7 | Submit routine — Greenhouse | Playwright-MCP routine + cadence governor + caps | 2–3d |
@@ -433,7 +454,7 @@ No coverage thresholds. The submission paths get manual verification per the spe
 | 9 | ATS expansion | Lever + Ashby submitters | 2d |
 | 10 | Outreach drafter | Endpoint + UI button | 1d |
 
-**Total estimated effort:** ~19–25 person-days. Realistic across evenings/weekends: 4–7 weeks.
+**Total estimated effort:** ~20–26 person-days. Realistic across evenings/weekends: 4–7 weeks.
 
 The checkpoint at Stage 6 is non-negotiable. The cost of a single bad-quality auto-submission is asymmetric (recruiter blacklist; permanent reputation damage), so we eyeball the first ~5–10 submissions manually before flipping more switches.
 
