@@ -8,31 +8,64 @@ import type {
 
 const SYSTEM = `You score a job posting against a candidate's profile from 0–100.
 
-Dimensions (each 0–100):
-- skill_fit: technical & domain match between candidate's skills and the JD
-- level_fit: seniority alignment (intern << junior << mid << senior << staff << principal)
-- location_fit: how well the location/remote situation matches preferences
-- comp_fit (optional, only if JD mentions salary): does it meet the candidate's min?
+# Archetype-first scoring
 
-Overall score: weighted average — skill 40%, level 30%, location 20%, comp 10%
-(or skill 45%, level 35%, location 20% if comp not provided).
+Before scoring, identify two things:
+1. **Candidate archetype** — from the candidate's most recent title + bullet content:
+   examples: "product manager", "solutions engineer", "backend engineer", "frontend engineer",
+   "ml engineer", "data scientist", "designer", "data engineer", "devops/sre", "tpm",
+   "developer advocate", "technical writer".
+2. **Job archetype** — from the JD's title + description:
+   same vocabulary.
+
+**Archetype match is the dominant signal.** Skills overlap does NOT compensate for an
+archetype mismatch. A Product Manager applying to a Backend Engineer role is wrong-archetype
+regardless of how much shared vocabulary appears in the JD.
+
+# Dimensions (each 0–100)
+
+- **role_fit (weight 45%)** — archetype alignment + target-roles alignment:
+  - same archetype AND title matches one of preferences.target_roles → 90–100
+  - same archetype, related but not exact title → 70–85
+  - adjacent archetype (e.g. PM ↔ Solutions Engineer, ML Engineer ↔ Data Scientist) → 45–65
+  - wrong archetype (e.g. PM applying to SWE, Designer applying to TPM) → **0–25, hard cap**
+- **skill_fit (weight 25%)** — JD's required skills/tools vs candidate's primary+secondary
+- **level_fit (weight 20%)** — intern << junior << mid << senior << staff << principal
+- **location_fit (weight 7%)** — remote/timezone/country vs preferences
+- **comp_fit (weight 3%, only if JD lists salary)** — meets candidate's min
+
+Overall = weighted average. **If role_fit < 25, overall MUST be < 35.**
+
+# Output
 
 Return JSON ONLY (no code fences, no prose):
 {
-  "value": <integer 0–100>,
-  "reasoning": "1–2 sentences",
-  "dimensions": { "skill_fit": <int>, "level_fit": <int>, "location_fit": <int>, "comp_fit": <int|null> }
+  "value": <int 0-100>,
+  "reasoning": "<1-2 sentences: name the archetypes, then the verdict>",
+  "dimensions": {
+    "role_fit": <int>,
+    "skill_fit": <int>,
+    "level_fit": <int>,
+    "location_fit": <int>,
+    "comp_fit": <int|null>
+  }
 }`;
 
 function compactResume(s: ResumeStruct | undefined): string {
   if (!s) return "(no structured resume yet)";
-  const exp = s.experience
-    .map(
-      (e) => `${e.title} @ ${e.company} (${e.start}–${e.end ?? "now"})`
-    )
-    .join("; ");
-  const skills = [...s.skills.primary, ...s.skills.secondary].join(", ");
-  return `Experience: ${exp}\nSkills: ${skills}`;
+  const lines: string[] = [];
+  // Most recent role first — include 3 bullets so the LLM can see what the candidate actually does
+  for (const e of s.experience.slice(0, 3)) {
+    lines.push(`- ${e.title} @ ${e.company} (${e.start}–${e.end ?? "now"})`);
+    for (const b of e.bullets.slice(0, 3)) {
+      lines.push(`    • ${b.text}`);
+    }
+  }
+  const skills = [
+    ...s.skills.primary.slice(0, 12),
+    ...s.skills.secondary.slice(0, 8),
+  ].join(", ");
+  return `Recent experience:\n${lines.join("\n")}\n\nSkills: ${skills}`;
 }
 
 export async function scoreJob(
@@ -40,12 +73,18 @@ export async function scoreJob(
   posting: JobPosting
 ): Promise<JobScore> {
   const client = getAnthropic();
+  const targetRoles = profile.preferences.target_roles?.length
+    ? profile.preferences.target_roles.join(", ")
+    : "(none specified)";
+
   const userText = [
     `# Candidate profile`,
     compactResume(profile.resume_struct),
-    `Preferences: ${JSON.stringify(profile.preferences)}`,
     ``,
-    `# Job`,
+    `Candidate's stated target roles (use to anchor role_fit):`,
+    targetRoles,
+    ``,
+    `# Job posting`,
     `Title: ${posting.title}`,
     `Company: ${posting.company.name}`,
     `Location: ${posting.location.raw}${posting.location.remote ? " (remote)" : ""}`,
@@ -55,7 +94,7 @@ export async function scoreJob(
 
   const response = await client.messages.create({
     model: MODEL_HAIKU,
-    max_tokens: 500,
+    max_tokens: 600,
     system: SYSTEM,
     messages: [{ role: "user", content: userText }],
   });
@@ -72,6 +111,7 @@ export async function scoreJob(
     value: number;
     reasoning: string;
     dimensions: {
+      role_fit?: number;
       skill_fit: number;
       level_fit: number;
       location_fit: number;

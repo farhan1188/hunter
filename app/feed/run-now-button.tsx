@@ -5,20 +5,27 @@ import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 
 /**
- * Trio of action buttons for the feed:
- *   - Crawl: fetch from all enabled adapters
+ * Action buttons for the feed:
+ *   - Crawl: fetch new postings from all enabled adapters
  *   - Annotate: classify visa/timezone on any unknown jobs
- *   - Score: rank all unscored jobs against your profile
+ *   - Score: rank unscored jobs against your profile
+ *   - Re-score all: wipe all scores and re-rank everything (use when scoring prompt
+ *     or your preferences/resume have changed)
  *
- * Each runs the action locally (Next.js route handler). The Ingest routine
- * will do the same on a 2h schedule once deployed via /schedule.
+ * Each runs the action via the local Hub API. The Ingest routine does the same
+ * on a 2h schedule once deployed via /schedule.
  */
 export function RunNowButton() {
   const router = useRouter();
   const [busy, setBusy] = useState<string | null>(null);
   const [status, setStatus] = useState<string | null>(null);
 
-  async function run(label: string, url: string, opts: { loopUntilZero?: keyof Counts } = {}) {
+  async function run(
+    label: string,
+    url: string,
+    opts: { loopUntilZero?: keyof Counts; confirm?: string } = {}
+  ) {
+    if (opts.confirm && !confirm(opts.confirm)) return;
     setBusy(label);
     setStatus(null);
     try {
@@ -38,7 +45,6 @@ export function RunNowButton() {
           setBusy(`${label}... (batch ${iterations}, +${n})`);
           if (n === 0 || iterations >= 20) break;
         } else {
-          // single-shot — summarize whatever came back
           total =
             "results" in body
               ? body.results.reduce(
@@ -52,14 +58,16 @@ export function RunNowButton() {
       setStatus(`${label}: ${total} processed`);
       router.refresh();
     } catch (err) {
-      setStatus(`${label} error: ${err instanceof Error ? err.message : String(err)}`);
+      setStatus(
+        `${label} error: ${err instanceof Error ? err.message : String(err)}`
+      );
     } finally {
       setBusy(null);
     }
   }
 
   return (
-    <div className="flex items-center gap-2">
+    <div className="flex flex-wrap items-center gap-2">
       <Button
         variant="outline"
         disabled={!!busy}
@@ -80,6 +88,19 @@ export function RunNowButton() {
         onClick={() => run("Score", "/api/score", { loopUntilZero: "scored" })}
       >
         {busy?.startsWith("Score") ? busy : "Score"}
+      </Button>
+      <Button
+        variant="outline"
+        disabled={!!busy}
+        onClick={() =>
+          run("Re-score all", "/api/score?all=true", {
+            loopUntilZero: "scored",
+            confirm:
+              "Wipe all existing scores and re-rank every job from scratch? This is needed after changes to your resume, preferences, or the scoring prompt.",
+          })
+        }
+      >
+        {busy?.startsWith("Re-score") ? busy : "Re-score all"}
       </Button>
       {status && <span className="text-xs text-gray-600">{status}</span>}
     </div>
