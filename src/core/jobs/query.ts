@@ -25,6 +25,11 @@ export async function listFeed(filters: FeedFilters = {}): Promise<FeedRow[]> {
   if (!filters.include_closed) {
     wheres.push("j.status = 'open'");
   }
+  // Hide archetype mismatches by default (they're wrong-career-family jobs).
+  // include_closed also reveals these for transparency.
+  if (!filters.include_closed) {
+    wheres.push("j.archetype_match IN ('match', 'maybe', 'unknown')");
+  }
   if (filters.source) {
     wheres.push("j.source = ?");
     args.push(filters.source);

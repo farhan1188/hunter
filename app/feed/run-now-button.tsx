@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button";
 /**
  * Action buttons for the feed:
  *   - Crawl: fetch new postings from all enabled adapters
+ *   - Reclassify: tag legacy jobs with archetype_match (match/maybe/mismatch)
  *   - Annotate: classify visa/timezone on any unknown jobs
  *   - Score: rank unscored jobs against your profile
- *   - Re-score all: wipe all scores and re-rank everything (use when scoring prompt
- *     or your preferences/resume have changed)
+ *   - Re-score all: wipe and re-rank everything (use after preferences/resume change)
  *
- * Each runs the action via the local Hub API. The Ingest routine does the same
- * on a 2h schedule once deployed via /schedule.
+ * Each loops in batches and shows `processed/remaining` + ETA on the button.
  */
 export function RunNowButton() {
   const router = useRouter();
@@ -23,7 +22,11 @@ export function RunNowButton() {
   async function run(
     label: string,
     url: string,
-    opts: { loopUntilZero?: keyof Counts; confirm?: string } = {}
+    opts: {
+      progressKey?: keyof Counts;
+      remainingKey?: keyof Counts;
+      confirm?: string;
+    } = {}
   ) {
     if (opts.confirm && !confirm(opts.confirm)) return;
     setBusy(label);
@@ -31,6 +34,7 @@ export function RunNowButton() {
     try {
       let total = 0;
       let iterations = 0;
+      const startMs = Date.now();
       while (true) {
         iterations++;
         const res = await fetch(url, { method: "POST" });
@@ -39,11 +43,17 @@ export function RunNowButton() {
           setStatus(`${label} failed: ${body.error ?? res.status}`);
           return;
         }
-        if (opts.loopUntilZero) {
-          const n = Number((body as Counts)[opts.loopUntilZero] ?? 0);
+        if (opts.progressKey) {
+          const n = Number((body as Counts)[opts.progressKey] ?? 0);
           total += n;
-          setBusy(`${label}... (batch ${iterations}, +${n})`);
-          if (n === 0 || iterations >= 20) break;
+          const remaining = opts.remainingKey
+            ? Number((body as Counts)[opts.remainingKey] ?? 0)
+            : null;
+          const eta = etaString(startMs, total, remaining);
+          setBusy(
+            `${label}... ${total}${remaining !== null ? ` / ${total + remaining}` : ""}${eta}`
+          );
+          if (n === 0 || iterations >= 50) break;
         } else {
           total =
             "results" in body
@@ -78,14 +88,33 @@ export function RunNowButton() {
       <Button
         variant="outline"
         disabled={!!busy}
-        onClick={() => run("Annotate", "/api/annotate", { loopUntilZero: "annotated" })}
+        onClick={() =>
+          run("Reclassify", "/api/reclassify", {
+            progressKey: "classified",
+            remainingKey: "remaining",
+          })
+        }
+      >
+        {busy?.startsWith("Reclassify") ? busy : "Reclassify"}
+      </Button>
+      <Button
+        variant="outline"
+        disabled={!!busy}
+        onClick={() =>
+          run("Annotate", "/api/annotate", { progressKey: "annotated" })
+        }
       >
         {busy?.startsWith("Annotate") ? busy : "Annotate"}
       </Button>
       <Button
         variant="outline"
         disabled={!!busy}
-        onClick={() => run("Score", "/api/score", { loopUntilZero: "scored" })}
+        onClick={() =>
+          run("Score", "/api/score", {
+            progressKey: "scored",
+            remainingKey: "remaining",
+          })
+        }
       >
         {busy?.startsWith("Score") ? busy : "Score"}
       </Button>
@@ -94,9 +123,10 @@ export function RunNowButton() {
         disabled={!!busy}
         onClick={() =>
           run("Re-score all", "/api/score?all=true", {
-            loopUntilZero: "scored",
+            progressKey: "scored",
+            remainingKey: "remaining",
             confirm:
-              "Wipe all existing scores and re-rank every job from scratch? This is needed after changes to your resume, preferences, or the scoring prompt.",
+              "Wipe all existing scores and re-rank every job from scratch? Use after resume/preferences/scoring-prompt changes.",
           })
         }
       >
@@ -107,7 +137,22 @@ export function RunNowButton() {
   );
 }
 
+function etaString(
+  startMs: number,
+  done: number,
+  remaining: number | null
+): string {
+  if (remaining === null || remaining <= 0 || done <= 0) return "";
+  const elapsed = (Date.now() - startMs) / 1000;
+  const perJob = elapsed / done;
+  const etaSec = perJob * remaining;
+  const min = Math.ceil(etaSec / 60);
+  return ` (~${min}m left)`;
+}
+
 interface Counts {
   scored?: number;
   annotated?: number;
+  classified?: number;
+  remaining?: number;
 }

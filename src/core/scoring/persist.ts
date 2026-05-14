@@ -23,6 +23,7 @@ export async function scoreUnscored(
   db: Client,
   profile: Profile
 ): Promise<number> {
+  // Skip archetype mismatches — they're wrong career family, not worth Sonnet scoring.
   const { rows } = await db.execute(`
     SELECT j.id, j.source, j.external_id, j.url,
            j.company_name, j.title,
@@ -31,6 +32,7 @@ export async function scoreUnscored(
     FROM jobs j
     LEFT JOIN scores s ON s.job_id = j.id
     WHERE s.job_id IS NULL AND j.archived = 0
+      AND j.archetype_match IN ('match', 'maybe', 'unknown')
     ORDER BY j.fetched_at DESC
     LIMIT 100
   `);
