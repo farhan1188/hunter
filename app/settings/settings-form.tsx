@@ -29,6 +29,16 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
 
   return (
     <div className="mt-2 grid grid-cols-2 gap-4">
+      <div className="col-span-2 flex items-center gap-3 rounded border border-red-200 bg-red-50 px-3 py-2">
+        <Switch
+          checked={s.submission_paused}
+          onCheckedChange={(v) => setS({ ...s, submission_paused: v })}
+        />
+        <Label className="font-semibold text-red-700">
+          Submission paused (kill switch — overrides auto_submit on all
+          adapters)
+        </Label>
+      </div>
       <div>
         <Label>Daily submit cap (0 = no cap)</Label>
         <Input
@@ -101,6 +111,34 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
           }
         />
         <Label>Show all country-specific jobs in feed</Label>
+      </div>
+      <div>
+        <Label>Cover letter max words</Label>
+        <Input
+          type="number"
+          value={s.cover_letter_max_words}
+          onChange={(e) =>
+            setS({ ...s, cover_letter_max_words: Number(e.target.value) })
+          }
+        />
+      </div>
+      <div>
+        <Label>Quality review failure mode</Label>
+        <select
+          className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
+          value={s.quality_review_failure_mode}
+          onChange={(e) =>
+            setS({
+              ...s,
+              quality_review_failure_mode: e.target.value as
+                | "review"
+                | "auto_skip",
+            })
+          }
+        >
+          <option value="review">review (hold for human)</option>
+          <option value="auto_skip">auto_skip (discard silently)</option>
+        </select>
       </div>
 
       <div className="col-span-2 flex items-center gap-2">

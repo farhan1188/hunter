@@ -16,7 +16,14 @@ type Body =
       enabled?: boolean;
       config_json?: string;
     }
-  | { type: "adapter_upsert"; name: string; enabled: boolean; config: object };
+  | { type: "adapter_upsert"; name: string; enabled: boolean; config: object }
+  | {
+      type: "adapter_dial";
+      name: string;
+      submit_mode?: "off" | "click_to_send" | "auto_submit";
+      score_threshold?: number | null;
+      daily_cap?: number | null;
+    };
 
 export async function POST(req: NextRequest) {
   const body = (await req.json()) as Body;
@@ -30,6 +37,12 @@ export async function POST(req: NextRequest) {
     });
   } else if (body.type === "adapter_upsert") {
     await upsertAdapter(body.name, body.enabled, body.config);
+  } else if (body.type === "adapter_dial") {
+    await updateAdapter(body.name, {
+      submit_mode: body.submit_mode,
+      score_threshold: body.score_threshold,
+      daily_cap: body.daily_cap,
+    });
   }
   return NextResponse.json({ ok: true });
 }

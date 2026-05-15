@@ -6,6 +6,10 @@ import { AdaptersList } from "./adapters-list";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
+  const apifyStatus = process.env.APIFY_API_TOKEN
+    ? "set"
+    : "missing — add APIFY_API_TOKEN to .env";
+
   let settings;
   let adapters;
   let dbError: string | null = null;
@@ -20,7 +24,19 @@ export default async function SettingsPage() {
 
   return (
     <main className="space-y-8">
-      <h1 className="text-2xl font-bold">Settings</h1>
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-bold">Settings</h1>
+        <span className="text-xs text-gray-500">
+          APIFY_API_TOKEN:{" "}
+          <span
+            className={
+              apifyStatus === "set" ? "text-green-600" : "text-red-600"
+            }
+          >
+            {apifyStatus}
+          </span>
+        </span>
+      </div>
 
       {dbError && (
         <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">

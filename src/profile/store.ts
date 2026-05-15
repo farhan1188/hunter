@@ -73,16 +73,21 @@ export interface AppSettings {
   default_target_timezone: string;
   cadence_floor_minutes: number;
   feed_show_country_specific: boolean;
+  submission_paused: boolean;
+  cover_letter_max_words: number;
+  quality_review_failure_mode: "review" | "auto_skip";
 }
 
 export async function getSettings(): Promise<AppSettings> {
   const { rows } = await getDb().execute(
     `SELECT id, daily_cap, weekly_cap, score_threshold, aggressiveness,
             token_budget_daily_usd, dry_run, default_target_timezone,
-            cadence_floor_minutes, feed_show_country_specific
+            cadence_floor_minutes, feed_show_country_specific,
+            submission_paused, cover_letter_max_words, quality_review_failure_mode
      FROM settings WHERE id = 1`
   );
   const r = rows[0];
+  const qrfm = (r.quality_review_failure_mode as string) || "review";
   return {
     daily_cap: Number(r.daily_cap),
     weekly_cap: Number(r.weekly_cap),
@@ -93,6 +98,10 @@ export async function getSettings(): Promise<AppSettings> {
     default_target_timezone: r.default_target_timezone as string,
     cadence_floor_minutes: Number(r.cadence_floor_minutes),
     feed_show_country_specific: Number(r.feed_show_country_specific) === 1,
+    submission_paused: Number(r.submission_paused) === 1,
+    cover_letter_max_words: Number(r.cover_letter_max_words) || 250,
+    quality_review_failure_mode:
+      qrfm === "auto_skip" ? "auto_skip" : "review",
   };
 }
 
@@ -101,7 +110,8 @@ export async function saveSettings(s: AppSettings): Promise<void> {
     sql: `UPDATE settings SET
       daily_cap=?, weekly_cap=?, score_threshold=?, aggressiveness=?,
       token_budget_daily_usd=?, dry_run=?, default_target_timezone=?,
-      cadence_floor_minutes=?, feed_show_country_specific=?
+      cadence_floor_minutes=?, feed_show_country_specific=?,
+      submission_paused=?, cover_letter_max_words=?, quality_review_failure_mode=?
       WHERE id = 1`,
     args: [
       s.daily_cap,
@@ -113,6 +123,9 @@ export async function saveSettings(s: AppSettings): Promise<void> {
       s.default_target_timezone,
       s.cadence_floor_minutes,
       s.feed_show_country_specific ? 1 : 0,
+      s.submission_paused ? 1 : 0,
+      s.cover_letter_max_words,
+      s.quality_review_failure_mode,
     ],
   });
 }
@@ -124,30 +137,50 @@ export interface AdapterRow {
   last_run_at: string | null;
   last_error: string | null;
   consecutive_failures: number;
+  submit_mode: "off" | "click_to_send" | "auto_submit";
+  ats_vendor: string | null;
+  score_threshold: number | null;
+  daily_cap: number | null;
 }
 
 export async function listAdapters(): Promise<AdapterRow[]> {
   const { rows } = await getDb().execute(
     `SELECT name, enabled, config_json, last_run_at, last_success_at,
-            last_error, consecutive_failures
+            last_error, consecutive_failures,
+            submit_mode, ats_vendor, score_threshold, daily_cap
      FROM adapters ORDER BY name`
   );
-  return rows.map((r) => ({
-    name: r.name as string,
-    enabled: Number(r.enabled) === 1,
-    config_json: (r.config_json as string) || "{}",
-    last_run_at: (r.last_run_at as string | null) ?? null,
-    last_error: (r.last_error as string | null) ?? null,
-    consecutive_failures: Number(r.consecutive_failures),
-  }));
+  return rows.map((r) => {
+    const sm = (r.submit_mode as string) || "off";
+    return {
+      name: r.name as string,
+      enabled: Number(r.enabled) === 1,
+      config_json: (r.config_json as string) || "{}",
+      last_run_at: (r.last_run_at as string | null) ?? null,
+      last_error: (r.last_error as string | null) ?? null,
+      consecutive_failures: Number(r.consecutive_failures),
+      submit_mode:
+        sm === "click_to_send" || sm === "auto_submit" ? sm : "off",
+      ats_vendor: (r.ats_vendor as string | null) ?? null,
+      score_threshold:
+        r.score_threshold != null ? Number(r.score_threshold) : null,
+      daily_cap: r.daily_cap != null ? Number(r.daily_cap) : null,
+    };
+  });
 }
 
 export async function updateAdapter(
   name: string,
-  patch: { enabled?: boolean; config_json?: string }
+  patch: {
+    enabled?: boolean;
+    config_json?: string;
+    submit_mode?: AdapterRow["submit_mode"];
+    score_threshold?: number | null;
+    daily_cap?: number | null;
+  }
 ): Promise<void> {
   const sets: string[] = [];
-  const args: (string | number)[] = [];
+  const args: (string | number | null)[] = [];
   if (patch.enabled !== undefined) {
     sets.push("enabled = ?");
     args.push(patch.enabled ? 1 : 0);
@@ -155,6 +188,18 @@ export async function updateAdapter(
   if (patch.config_json !== undefined) {
     sets.push("config_json = ?");
     args.push(patch.config_json);
+  }
+  if (patch.submit_mode !== undefined) {
+    sets.push("submit_mode = ?");
+    args.push(patch.submit_mode);
+  }
+  if ("score_threshold" in patch) {
+    sets.push("score_threshold = ?");
+    args.push(patch.score_threshold ?? null);
+  }
+  if ("daily_cap" in patch) {
+    sets.push("daily_cap = ?");
+    args.push(patch.daily_cap ?? null);
   }
   if (sets.length === 0) return;
   args.push(name);
