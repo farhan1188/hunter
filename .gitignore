@@ -46,3 +46,9 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 .playwright-mcp/
+
+# Verification screenshots (Apify console captures from spec brainstorming)
+apify-*.png
+
+# Local Typst smoke-test output
+test-resume.pdf
