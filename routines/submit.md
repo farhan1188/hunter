@@ -63,6 +63,32 @@ Ashby are added in Stage 8.
    );
    ```
 
+## Vendor selector recipes
+
+For each ATS, the form is different. Use these as the Playwright recipe per vendor:
+
+### Greenhouse
+- Apply URL pattern: `https://job-boards.greenhouse.io/<slug>/jobs/<job-id>` or `https://boards.greenhouse.io/<slug>/jobs/<job-id>`
+- Form fields: `<input id="first_name">`, `<input id="last_name">`, `<input id="email">`, `<input id="phone">`
+- Resume upload: `<input id="resume">` or `<input name="resume">`
+- Cover letter: `<textarea name="cover_letter">`
+- Submit: `<input type="submit">` or `<button type="submit">` with text "Submit Application"
+
+### Lever
+- Apply URL pattern: `https://jobs.lever.co/<slug>/<job-id>/apply`
+- Form fields: `<input name="name">`, `<input name="email">`, `<input name="phone">`
+- Resume upload: `<input type="file" name="resume">`
+- Cover letter: `<textarea name="comments">`
+- Submit: `<button type="submit">` with text "Submit application"
+
+### Ashby
+- Apply URL pattern: `https://jobs.ashbyhq.com/<slug>/<uuid>/application`
+- Form is a single-page SPA — wait for hydration (`networkidle`) before extracting fields.
+- Form fields: discoverable by label text near each input (first name / last name / email / phone)
+- Resume upload: file input near "Resume*" label
+- Cover letter: rich text editor — use Playwright's `.fill()` on the `contenteditable` element near "Cover Letter*" label
+- Submit: button with exact text "Submit Application" — wait until it's enabled
+
 ## Stage-6 checkpoint reminder
 
 After the first 5-10 successful auto-submissions, STOP and have the user review
