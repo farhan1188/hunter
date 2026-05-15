@@ -1,0 +1,47 @@
+[
+  {
+    "id": "4414966218",
+    "title": "Product Manager, Data Platform Integrations",
+    "linkedinUrl": "https://www.linkedin.com/jobs/view/4414966218/",
+    "jobState": "LISTED",
+    "postedDate": "2026-05-14T23:03:59.000Z",
+    "descriptionText": "About the Company\nAttentive is the AI marketing platform...",
+    "location": { "linkedinText": "United States", "countryCode": "us", "postalAddress": null },
+    "workplaceType": "remote",
+    "workRemoteAllowed": true,
+    "easyApplyUrl": "https://www.linkedin.com/job-apply/4414966218",
+    "applyMethod": { "companyApplyUrl": "https://job-boards.greenhouse.io/attentive/jobs/4247514009?gh_src=63pk6gu69us" },
+    "company": { "name": "Attentive" },
+    "applicantTrackingSystem": "Greenhouse"
+  },
+  {
+    "id": "4414491812",
+    "title": "Senior Product Owner | UX | Product Manager | Figma | User-Centric Design | Hybrid, London",
+    "linkedinUrl": "https://www.linkedin.com/jobs/view/4414491812/",
+    "jobState": "LISTED",
+    "postedDate": "2026-05-14T16:29:16.000Z",
+    "descriptionText": "Senior Product Owner role at Enigma...",
+    "location": { "linkedinText": "London Area, United Kingdom", "countryCode": "gb", "postalAddress": null },
+    "workplaceType": "hybrid",
+    "workRemoteAllowed": false,
+    "easyApplyUrl": "https://www.linkedin.com/job-apply/4414491812",
+    "applyMethod": { "companyApplyUrl": null },
+    "company": { "name": "Enigma" },
+    "applicantTrackingSystem": "LinkedIn"
+  },
+  {
+    "id": "4414779168",
+    "title": "Senior Data Product Manager (Remote)",
+    "linkedinUrl": "https://www.linkedin.com/jobs/view/4414779168/",
+    "jobState": "LISTED",
+    "postedDate": "2026-05-14T23:03:35.000Z",
+    "descriptionText": "Senior Data Product Manager at ezCater...",
+    "location": { "linkedinText": "United States", "countryCode": "us", "postalAddress": null },
+    "workplaceType": "remote",
+    "workRemoteAllowed": true,
+    "easyApplyUrl": null,
+    "applyMethod": { "companyApplyUrl": "https://job-boards.greenhouse.io/ezcaterinc/jobs/5138257007?gh_src=a882cb547us" },
+    "company": { "name": "ezCater" },
+    "applicantTrackingSystem": null
+  }
+]
