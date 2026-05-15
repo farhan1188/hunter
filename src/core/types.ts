@@ -26,13 +26,13 @@ export interface JobPosting {
   source: AdapterName;
   external_id: string;
   url: string;
-  apply_url?: string;
+  apply_url?: string | null;
   company: { name: string; domain?: string; hq_country?: string };
   title: string;
   location: { remote: boolean; raw: string; geo?: string };
   visa: { category: VisaCategory; target_countries: string[] };
   target_timezone?: string;
-  ats_vendor?: string;
+  ats_vendor?: string | null;
   description_md: string;
   posted_at: string;
   raw_ref?: string;

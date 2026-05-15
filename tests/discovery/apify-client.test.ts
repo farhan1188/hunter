@@ -6,7 +6,10 @@ describe("apify-client.runActorSync", () => {
   afterEach(() => { vi.restoreAllMocks(); });
 
   it("posts to the run-sync-get-dataset-items endpoint with the right shape", async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify(sample), { status: 200 }));
+    type FetchArgs = [input: RequestInfo | URL, init?: RequestInit];
+    const fetchMock = vi.fn<(...args: FetchArgs) => Promise<Response>>(
+      async () => new Response(JSON.stringify(sample), { status: 200 })
+    );
     vi.stubGlobal("fetch", fetchMock);
 
     const result = await runActorSync({
@@ -16,9 +19,9 @@ describe("apify-client.runActorSync", () => {
     });
 
     expect(result).toHaveLength(3);
-    expect(result[0].id).toBe("4414966218");
+    expect((result[0] as { id: string }).id).toBe("4414966218");
     expect(fetchMock).toHaveBeenCalledOnce();
-    const [url, init] = fetchMock.mock.calls[0];
+    const [url, init] = fetchMock.mock.calls[0]!;
     expect(String(url)).toContain("zn01OAlzP853oqn4Z");
     expect(String(url)).toContain("run-sync-get-dataset-items");
     expect(String(url)).toContain("token=test-token");

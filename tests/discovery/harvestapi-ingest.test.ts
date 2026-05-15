@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { harvestApiToJobPosting, normalizeAts } from "@/src/core/discovery/harvestapi-ingest";
-import sample from "@/tests/fixtures/harvestapi-sample.json";
+import type { HarvestApiItem } from "@/src/core/discovery/harvestapi-ingest";
+import sampleRaw from "@/tests/fixtures/harvestapi-sample.json";
+const sample = sampleRaw as unknown as HarvestApiItem[];
 
 describe("harvestapi-ingest", () => {
   it("normalizes ATS vendor names to lowercase canonical form", () => {
