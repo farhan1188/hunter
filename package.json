@@ -9,7 +9,8 @@
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",
-    "db:migrate": "tsx src/db/migrate.ts"
+    "db:migrate": "tsx src/db/migrate.ts",
+    "agent": "cd agent && npm run agent"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.96.0",
