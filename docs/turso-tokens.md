@@ -45,3 +45,15 @@ when deploying the routine.
 
 To rotate: `turso db tokens invalidate <token-id>` (find IDs via
 `turso db tokens list job-hunter`), then issue a new one and update the routine env.
+
+## v1 additions (2026-05-14)
+
+The Tailor and Submit routines need scoped tokens:
+
+| Routine | Read | Write |
+|---|---|---|
+| Tailor | `profile`, `applications`, `jobs`, `routine_runs` | `applications`, `routine_runs` |
+| Submit | `applications`, `jobs`, `qa_kb`, `adapters`, `settings`, `routine_runs` | `applications`, `routine_runs`, `adapters` (last_submit_at) |
+| HarvestAPI | `adapters` (read config), `profile`, `routine_runs` | `jobs`, `scores`, `applications`, `routine_runs`, `adapters` (status fields) |
+
+Generate via the Turso web console → Tokens. Store in routine `.env` as `TURSO_AUTH_TOKEN_TAILOR`, `TURSO_AUTH_TOKEN_SUBMIT`, `TURSO_AUTH_TOKEN_HARVESTAPI`.
