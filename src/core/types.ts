@@ -12,7 +12,8 @@ export type AdapterName =
   | "greenhouse"
   | "lever"
   | "ashby"
-  | "linkedin";
+  | "linkedin"
+  | "manual";
 
 export type VisaCategory =
   | "country_specific"
@@ -25,11 +26,13 @@ export interface JobPosting {
   source: AdapterName;
   external_id: string;
   url: string;
+  apply_url?: string;
   company: { name: string; domain?: string; hq_country?: string };
   title: string;
   location: { remote: boolean; raw: string; geo?: string };
   visa: { category: VisaCategory; target_countries: string[] };
   target_timezone?: string;
+  ats_vendor?: string;
   description_md: string;
   posted_at: string;
   raw_ref?: string;
