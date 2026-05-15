@@ -9,6 +9,8 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [outreachDraft, setOutreachDraft] = useState<string | null>(null);
+  const [outreachBusy, setOutreachBusy] = useState(false);
 
   async function act(path: string, body: object) {
     setBusy(true);
@@ -27,6 +29,24 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
     } finally {
       setBusy(false);
     }
+  }
+
+  async function generateOutreach() {
+    setOutreachBusy(true);
+    try {
+      const res = await fetch(`/api/applications/${application.id}/outreach`, { method: "POST" });
+      const data = await res.json();
+      if (res.ok) setOutreachDraft(data.draft);
+      else setError(data.error ?? `HTTP ${res.status}`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setOutreachBusy(false);
+    }
+  }
+
+  function copyDraft() {
+    if (outreachDraft) navigator.clipboard.writeText(outreachDraft);
   }
 
   const gates = application.quality_gates as Record<string, unknown> | null;
@@ -77,6 +97,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
           <TabsTrigger value="gates">Quality gates</TabsTrigger>
           <TabsTrigger value="qa">Q&A</TabsTrigger>
           <TabsTrigger value="jd">JD</TabsTrigger>
+          <TabsTrigger value="outreach">Outreach</TabsTrigger>
         </TabsList>
 
         <TabsContent value="cover">
@@ -140,6 +161,30 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
           <pre className="whitespace-pre-wrap rounded border bg-white p-3 text-xs">
             {application.description_md}
           </pre>
+        </TabsContent>
+
+        <TabsContent value="outreach">
+          {outreachDraft ? (
+            <div className="space-y-2">
+              <pre className="whitespace-pre-wrap rounded border bg-white p-3 text-sm">
+                {outreachDraft}
+              </pre>
+              <button
+                className="rounded border bg-white px-3 py-1 text-sm hover:bg-gray-50"
+                onClick={copyDraft}
+              >
+                Copy
+              </button>
+            </div>
+          ) : (
+            <button
+              className="rounded border bg-white px-3 py-1 text-sm hover:bg-gray-50 disabled:opacity-50"
+              disabled={outreachBusy}
+              onClick={generateOutreach}
+            >
+              {outreachBusy ? "Drafting…" : "Draft LinkedIn DM"}
+            </button>
+          )}
         </TabsContent>
       </Tabs>
     </div>
