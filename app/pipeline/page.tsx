@@ -4,6 +4,7 @@ import { getDb } from "@/src/db/client";
 import { formatDistanceToNow } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { PasteUrlForm } from "./paste-url-form";
+import { RunAgentButton } from "./run-agent-button";
 import type { ApplicationState } from "@/src/core/applications/types";
 
 export const dynamic = "force-dynamic";
@@ -32,9 +33,12 @@ export default async function PipelinePage() {
 
   return (
     <main className="space-y-4">
-      <div className="flex items-baseline justify-between">
+      <div className="flex items-baseline justify-between gap-4">
         <h1 className="text-2xl font-bold">Pipeline</h1>
-        <PasteUrlForm />
+        <div className="flex items-start gap-3">
+          <RunAgentButton />
+          <PasteUrlForm />
+        </div>
       </div>
 
       {dbError && (
