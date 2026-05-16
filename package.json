@@ -10,6 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:migrate": "tsx src/db/migrate.ts",
+    "ingest:linkedin": "tsx scripts/run-harvestapi.ts",
+    "tailor": "tsx scripts/run-tailor.ts",
     "agent": "cd agent && npm run agent"
   },
   "dependencies": {
