@@ -110,16 +110,19 @@ async function main() {
         tailored_bullets: tailoredBullets,
         cover_letter: coverLetter,
         verbatim_phrase: verbatim?.phrase ?? null,
+        company_name: app.company_name,
+        role_title: app.title,
       });
 
-      // h/i. Transition based on gate outcome
-      if (allGatesPass(gates)) {
-        const atsNativeVendors = new Set(["greenhouse", "lever", "ashby"]);
-        const channel: ApplicationChannel =
-          app.ats_vendor && atsNativeVendors.has(app.ats_vendor)
-            ? "ats_native"
-            : "local_agent";
+      // h/i. Transition based on gate outcome. Persist artifacts in BOTH branches
+      // so quality_review cards have a resume + cover letter to review.
+      const atsNativeVendors = new Set(["greenhouse", "lever", "ashby"]);
+      const channel: ApplicationChannel =
+        app.ats_vendor && atsNativeVendors.has(app.ats_vendor)
+          ? "ats_native"
+          : "local_agent";
 
+      if (allGatesPass(gates)) {
         await transition(db, app.id, "ready", {
           channel,
           resume_pdf_path: pdfFilename,
@@ -130,6 +133,9 @@ async function main() {
         console.log(`  [ready]          ${label}`);
       } else {
         await transition(db, app.id, "quality_review", {
+          channel,
+          resume_pdf_path: pdfFilename,
+          cover_letter_md: coverLetter,
           quality_gates: gates,
         });
         qualityReview++;

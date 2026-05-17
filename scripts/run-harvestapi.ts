@@ -20,6 +20,7 @@ const ACTOR_ID = "zn01OAlzP853oqn4Z";
 const COUNTRY_NAMES: Record<string, string> = {
   us: "United States",
   gb: "United Kingdom",
+  uk: "United Kingdom",
   de: "Germany",
   nl: "Netherlands",
   ie: "Ireland",
@@ -27,45 +28,66 @@ const COUNTRY_NAMES: Record<string, string> = {
   au: "Australia",
   ae: "United Arab Emirates",
   sg: "Singapore",
+  pk: "Pakistan",
 };
 
-function parseArgs(): { rows: number } {
+function parseArgs(): { rows: number; titles: number; locations: number } {
   const args = process.argv.slice(2);
-  let rows = 10;
+  let rows = 5;
+  let titles = 3;
+  let locations = 3;
   for (const arg of args) {
-    const m = arg.match(/^--rows=(\d+)$/);
-    if (m) rows = parseInt(m[1], 10);
+    let m = arg.match(/^--rows=(\d+)$/);
+    if (m) { rows = parseInt(m[1], 10); continue; }
+    m = arg.match(/^--titles=(\d+)$/);
+    if (m) { titles = parseInt(m[1], 10); continue; }
+    m = arg.match(/^--locations=(\d+)$/);
+    if (m) { locations = parseInt(m[1], 10); continue; }
   }
-  return { rows };
+  return { rows, titles, locations };
 }
 
 async function main() {
-  const { rows: maxItems } = parseArgs();
+  const { rows: maxItems, titles: titleCap, locations: locationCap } = parseArgs();
   const token = process.env.APIFY_API_TOKEN;
   if (!token) throw new Error("APIFY_API_TOKEN is not set");
 
   const db = getDb();
   const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
 
-  // Build locations from user's work_auth_countries (cap at 5)
-  const locations = profile.preferences.work_auth_countries
-    .slice(0, 5)
+  // Build location list from union of work_auth + open_to_sponsorship countries,
+  // mapped to LinkedIn-recognized names. Capped by --locations.
+  // Sponsorship countries first — these are the markets the user actually targets.
+  // work_auth countries appended only for completeness.
+  const countryCodes = Array.from(
+    new Set([
+      ...(profile.preferences.open_to_sponsorship_countries ?? []),
+      ...profile.preferences.work_auth_countries,
+    ]),
+  );
+  const locations = countryCodes
     .map((code) => COUNTRY_NAMES[code.toLowerCase()])
-    .filter((name): name is string => name !== undefined);
+    .filter((name): name is string => name !== undefined)
+    .slice(0, locationCap);
 
-  const keywords = profile.preferences.target_roles.join(" OR ");
+  const jobTitles = profile.preferences.target_roles.slice(0, titleCap);
 
+  // HarvestAPI input schema (apify.com/harvestapi/linkedin-job-search):
+  // jobTitles (array), locations (array), maxItems is PER (title × location) pair.
   const input = {
-    searchQueries: [{ keyword: keywords, location: locations[0] ?? "United States" }],
+    jobTitles,
+    locations,
     maxItems,
-    publishedAt: "",
-    contractType: "",
-    experienceLevel: "",
-    workType: "",
-    ...(locations.length > 0 && { locationNames: locations }),
+    sortBy: "date" as const,
   };
 
-  console.log(`Running HarvestAPI actor (maxItems=${maxItems})...`);
+  const maxFetched = jobTitles.length * locations.length * maxItems;
+  console.log(
+    `Apify input: ${jobTitles.length} title(s) × ${locations.length} location(s) × maxItems=${maxItems} (up to ${maxFetched} jobs)`,
+  );
+  console.log(`  titles:    ${JSON.stringify(jobTitles)}`);
+  console.log(`  locations: ${JSON.stringify(locations)}`);
+  console.log(`Running HarvestAPI actor...`);
   const startedAt = new Date().toISOString();
 
   const items = await runActorSync<HarvestApiItem>({
