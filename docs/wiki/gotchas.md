@@ -6,6 +6,30 @@ Related: [conventions](conventions.md) | [architecture](architecture.md) | [deci
 
 ---
 
+## Remote-job boards gate the apply link behind paid plans
+
+**You'll see:** Adapter ingests jobs from WeWorkRemotely, Jobicy, Himalayas, WorkingNomads, etc. The `apply_url` looks reasonable but is the listing page on that board (not the company's ATS). Form-filler hits "no Submit button found." Manually opening the listing in Chrome reveals a `class="apply-btn--locked"` button that redirects to the board's signup/payment flow.
+
+**Cause:** These boards monetize by charging job seekers to apply. WeWorkRemotely's "Apply for this position" link is gated; with login it redirects to `/job-seekers/onboarding/step_3` which demands $2.95/mo with a 12-month commitment.
+
+**Fix:** Disable these adapters in the `adapters` table (`scripts/seed-remote-adapters.ts` enables them by default — re-disable after this finding). Stick with Greenhouse boards-api (public, free), HarvestAPI/LinkedIn (paid scrape but returns direct ATS URLs), and remotejobsfinder.co API (requires paid Pro subscription but returns direct `jobUrl`).
+
+**Why it's tricky:** The boards' job listings look identical to first-party ATS pages from the outside. The paywall is only visible when you click "Apply." We ingested 267 jobs from these sources before realizing they were dead ends.
+
+---
+
+## RJF API `type: "worldwide"` overstates true Pakistan-eligibility
+
+**You'll see:** `agent/scripts/ingest-rjf-api.ts` pulls jobs from `rjf-gateway-prod.globalwork.ai/api/v1/jobs/recommended` and many come back with `type: "worldwide"`. We mark them `visa_category='international_remote'` and try to submit. The form has a required "Do you have a legal right to work in the United States?" knockout question. Visiting the actual JD reveals the header says "Remote - USA" — the role is US-only.
+
+**Cause:** RJF's classification is generously interpreted from the description (likely an LLM tag matching the user's profile preferences) — it doesn't reflect the company's actual hiring scope. The company's JD header is authoritative.
+
+**Fix:** Don't trust third-party `type` tags. The ingest path should fetch the actual JD header (or read the description more carefully) and re-classify with our own paranoid classifier. A short helper in `src/core/ingest/classify.ts` post-checks for "Remote - USA" / "Remote - NAMER" / etc. in the JD body and downgrades to `country_specific`.
+
+**Why it's tricky:** RJF's API surfaces high-quality Senior PM candidates that match the user's profile — the temptation is to trust the `worldwide` tag and skip our own classifier. Don't.
+
+---
+
 ## Apify HarvestAPI returns wildly off-topic jobs
 
 **You'll see:** `npm run ingest:linkedin` succeeds, but the dataset contains random unrelated roles (Receiving Manager, Attorney, Spanish logistics coordinator) with very low scores. No HTTP error, no warning.

@@ -125,7 +125,7 @@ async function main() {
 
       // Qualify if score >= threshold (gate enforces visa eligibility internally)
       if (score.value >= settings.score_threshold) {
-        const appId = await createQualified(db, posting.id, null, posting.ats_vendor);
+        const appId = await createQualified(db, posting.id, null, posting.ats_vendor ?? null);
         if (appId) {
           qualified++;
           console.log(`  [qualified] ${label} — score=${score.value}, visa=${posting.visa.category}`);

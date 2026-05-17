@@ -5,6 +5,7 @@ import { getDb } from "@/src/db/client";
 import { getProfile, getSettings } from "@/src/profile/store";
 import { selectBullets } from "@/src/core/tailor/bullet-selection";
 import { renderResumePdf } from "@/src/core/tailor/typst-render";
+import { renderCoverLetterPdf } from "@/src/core/tailor/cover-letter-render";
 import {
   fetchAndSelectVerbatimPhrase,
 } from "@/src/core/tailor/verbatim-phrase";
@@ -82,6 +83,11 @@ async function main() {
       const pdfPath = path.join(TMP_DIR, pdfFilename);
       await writeFile(pdfPath, pdfBuffer);
 
+      // Cover-letter PDF — many ATS forms require a file upload, not text.
+      // Render alongside the resume so the agent has both ready.
+      const coverPdfFilename = `cover-${app.id}.pdf`;
+      const coverPdfPath = path.join(TMP_DIR, coverPdfFilename);
+
       // d. Verbatim phrase (may be null)
       const verbatim = app.apply_url
         ? await fetchAndSelectVerbatimPhrase(app.apply_url)
@@ -97,6 +103,22 @@ async function main() {
         max_words: settings.cover_letter_max_words,
         highlight_bullets: selectedBullets.slice(0, 4).map((b) => b.text),
       });
+
+      // e2. Render cover letter to PDF so ATS file-upload fields can use it.
+      try {
+        const coverPdfBuffer = await renderCoverLetterPdf({
+          candidate_name: profile.basics.name ?? "",
+          candidate_email: profile.basics.email,
+          candidate_phone: profile.basics.phone,
+          candidate_location: profile.basics.location,
+          letter_markdown: coverLetter,
+          company_name: app.company_name,
+          role_title: app.title,
+        });
+        await writeFile(coverPdfPath, coverPdfBuffer);
+      } catch (err) {
+        console.warn(`  cover PDF render failed for ${label}: ${(err as Error).message.slice(0, 120)}`);
+      }
 
       // f. Build gates input
       // v1 simplification: tailored == original (no rewriting yet; claim-equiv trivially passes)

@@ -5,9 +5,9 @@ import type { Page, Locator } from "playwright-core";
  * (lowercase, strip punctuation/whitespace, alias common variants).
  */
 const ALIASES: Record<string, string[]> = {
-  "first_name": ["first name", "firstname", "given name"],
-  "last_name":  ["last name", "lastname", "family name", "surname"],
-  "full_name":  ["full name", "your name", "name", "candidate name", "applicant name", "legal name"],
+  "first_name": ["first name", "firstname", "given name", "legal first name", "preferred first name"],
+  "last_name":  ["last name", "lastname", "family name", "surname", "legal last name", "preferred last name"],
+  "full_name":  ["full name", "your name", "name", "candidate name", "applicant name", "legal name", "legal full name"],
   "email":      ["email", "email address", "e-mail", "your email"],
   "phone":      ["phone", "phone number", "mobile", "tel", "telephone", "contact number"],
   "location":   ["location", "city", "current location", "your location", "where are you based", "based in"],

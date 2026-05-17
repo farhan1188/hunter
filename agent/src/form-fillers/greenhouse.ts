@@ -108,7 +108,16 @@ interface AnswerPlan {
   values: Record<string, string>;
   /** Absolute filesystem path to the resume PDF, or null. */
   resumePath: string | null;
+  /** Absolute filesystem path to the cover letter PDF, or null. */
+  coverLetterPath: string | null;
   halt: string | null;
+}
+
+/** Tailor writes cover letters to ./tmp/cover-<appId>.pdf alongside the
+ *  resume. Resolve to an absolute path if it exists. */
+function resolveCoverLetterPath(appId: string): string | null {
+  const filename = `cover-${appId}.pdf`;
+  return resolveResumePath(filename);
 }
 
 function planAnswers(
@@ -118,6 +127,7 @@ function planAnswers(
   const plan: AnswerPlan = {
     values: {},
     resumePath: resolveResumePath(ctx.application.resume_pdf_path ?? null),
+    coverLetterPath: resolveCoverLetterPath(ctx.application.id),
     halt: null,
   };
   const basics = ctx.profileBasics;
@@ -167,6 +177,26 @@ function planAnswers(
       if (/years.*experience/i.test(label)) {
         plan.values[field.name] = basics.years_experience ?? "5"; continue;
       }
+      // Custom-question variants of name fields ("Legal First Name",
+      // "Preferred First Name", etc.) — the canonical switch above only
+      // matches when field.name === 'first_name', but custom questions have
+      // numeric field names so the label is our only clue.
+      if (/\b(legal|preferred)?\s*first\s*name\b/i.test(label)) {
+        plan.values[field.name] = basics.first_name ?? ""; continue;
+      }
+      if (/\b(legal|preferred)?\s*last\s*name\b/i.test(label) ||
+          /\b(legal|preferred)?\s*(family\s+name|surname)\b/i.test(label)) {
+        plan.values[field.name] = basics.last_name ?? ""; continue;
+      }
+      if (/\b(legal|preferred)?\s*full\s*name\b/i.test(label) || /^name\b/i.test(label)) {
+        plan.values[field.name] = basics.full_name ?? `${basics.first_name ?? ""} ${basics.last_name ?? ""}`.trim();
+        continue;
+      }
+      // Pronouns — skip; not required and usually optional
+      if (/pronouns?/i.test(label)) {
+        if (!q.required) continue;
+        plan.values[field.name] = "He/Him"; continue;
+      }
       // Required free-text that we couldn't classify → halt
       if (q.required) {
         plan.halt = `Greenhouse required text question with no auto-answer: "${label}"`;
@@ -202,10 +232,13 @@ function planAnswers(
         const yes = pickOption(field.values, ["Yes"]);
         if (yes) { plan.values[field.name] = String(yes.value); continue; }
       }
-      // Work authorization — pick "need visa support" / "not authorized"
-      if (/authorization to work|work authorization|legally authorized/i.test(label)) {
+      // Work authorization — pick "need visa support" / "not authorized" / "No"
+      // Catches: "legally authorized", "authorization to work", "work authorization",
+      // "legal right to work", "right to work", "authorized to work", "eligible to work".
+      if (/authorization to work|work authorization|legally authorized|(legal\s+)?right to work|authorized to work|eligible to work/i.test(label)) {
         const opt = pickOption(field.values, [
           "not authorized", "need visa support", "no", "I am not authorized",
+          "No",
         ]);
         if (opt) { plan.values[field.name] = String(opt.value); continue; }
       }
@@ -226,6 +259,11 @@ function planAnswers(
       }
       // Prior employment / re-application history at this company — almost always No
       if (/have you (ever )?(been |worked |applied )?(employed|been employed|worked|applied) (at|to|by|for)|previously employed|prior employment|former employee|previously worked/i.test(label)) {
+        const no = pickOption(field.values, ["No"]);
+        if (no) { plan.values[field.name] = String(no.value); continue; }
+      }
+      // Family members / personal relationship with current employee — No
+      if (/family member|personal relationship|relative.*(employ|work)|friend.*(employ|work)|spouse.*(employ|work)|household member/i.test(label)) {
         const no = pickOption(field.values, ["No"]);
         if (no) { plan.values[field.name] = String(no.value); continue; }
       }
@@ -290,6 +328,19 @@ function planAnswers(
       if (/willing to relocate|relocate to|relocation/i.test(label)) {
         const yes = pickOption(field.values, ["Yes"]);
         if (yes) { plan.values[field.name] = String(yes.value); continue; }
+      }
+
+      // Generic Yes/No knockout fallback: if the question is a binary Yes/No
+      // we didn't recognize, default to "No" (honest fallback when we can't
+      // claim a specific experience or qualification). The application still
+      // submits and gets on record. The user can override later if needed.
+      const optLabels = (field.values ?? []).map((v) => (v.label || "").toLowerCase());
+      const isYesNo = optLabels.length === 2 &&
+        optLabels.some((l) => /^yes$/i.test(l)) &&
+        optLabels.some((l) => /^no$/i.test(l));
+      if (isYesNo && q.required) {
+        const no = pickOption(field.values, ["No"]);
+        if (no) { plan.values[field.name] = String(no.value); continue; }
       }
 
       if (q.required) {
@@ -387,6 +438,24 @@ export async function fillGreenhouse(page: Page, ctx: FillContext): Promise<Fill
     } catch {
       // Fallback to the generic uploadResume which picks the first file input.
       await uploadResume(ctxFrame as unknown as Page, plan.resumePath);
+    }
+  }
+
+  // 3b) Upload cover letter PDF. Many ATS forms require this as a file,
+  // not text. The tailor renders to ./tmp/cover-<appId>.pdf alongside the
+  // resume; if the form has a cover_letter file input, attach it. Skip if no
+  // such input exists (some boards have only resume).
+  if (plan.coverLetterPath) {
+    const coverInput = ctxFrame.locator(
+      'input[type="file"][name*="cover" i], input[type="file"][id*="cover" i]',
+    ).first();
+    if ((await coverInput.count()) > 0) {
+      try {
+        await coverInput.setInputFiles(plan.coverLetterPath, { timeout: 8000 });
+        console.log("[gh] cover letter attached");
+      } catch (err) {
+        console.warn(`[gh] cover letter upload failed: ${(err as Error).message.slice(0, 80)}`);
+      }
     }
   }
 

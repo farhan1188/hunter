@@ -2,9 +2,15 @@ import "dotenv/config";
 import { getDb } from "@/src/db/client";
 
 const TOKENS = [
+  // Original 12
   "gitlab", "canonical", "mozilla", "stripe", "elastic",
   "figma", "vercel", "mongodb", "contentful", "remote",
   "n26", "airbnb",
+  // YC + global-friendly additions (all verified live Greenhouse boards
+  // as of 2026-05-17):
+  "algolia", "cloudflare", "datadog", "sumup", "grafanalabs",
+  "trustpilot", "circleci", "pinterest", "squarespace", "lyft",
+  "instacart", "roblox",
 ];
 
 async function main() {
