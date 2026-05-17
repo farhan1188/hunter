@@ -13,6 +13,20 @@ Append-only chronological record of meaningful work. Newest at top. Format:
 
 ---
 
+## [2026-05-17] Goal session — humanize cover letters, fix UI gaps, new resume
+
+- **New resume imported** from `Farhan_Ahmed_Khan_Resume.docx`. Added `mammoth` for .docx → text extraction, plus `extractResumeFromText` in `src/profile/extract.ts` (parallel to the existing PDF path) and two one-shot scripts (`scripts/import-resume-docx.ts`, `scripts/import-basics-docx.ts`). Basics now populated from the resume header (name, email, phone, location, LinkedIn).
+- **Cover letters humanized.** Rewrote the prompt in `src/core/tailor/cover-letter.ts`: switched to Sonnet, banned em/en dashes + LLM clichés ("I am writing to express", "passionate about", "leverage", "moreover", etc.), required structure (3 short paras, specific opening, no sycophancy), and grounds the letter in top resume bullets (`highlight_bullets` parameter). Added a post-process `cleanLetter` pass that strips dashes and `[Candidate Name]` placeholders. Validated: 8/8 existing letters now have 0 dashes and 0 LLM tells.
+- **Job ingest dedupe**: `insertJobs` now deduplicates within a single batch — the same LinkedIn job can surface in multiple search queries within one run, which previously crashed on the UNIQUE constraint.
+- **Pipeline UI overhaul:**
+  - Nav: added Dashboard + Pipeline, dropped Inbox/History stubs, added current-page indicator.
+  - Dashboard: replaced the "Stale routines: ingest, backup, ..." gibberish with a "Today" hero card and an `Open pipeline →` CTA.
+  - Pipeline cards: color-coded score chips (green ≥85, blue ≥75, yellow ≥60), location chip (Remote / city), ATS tag, posted-time. Empty columns get explanatory hints.
+  - Detail page: tabs now stack correctly above the panel (was a Tailwind data-attribute mismatch in `components/ui/tabs.tsx`); cover letter renders as proper paragraphs with a Copy button + word count; **Resume tab embeds the actual PDF inline** via a new `/api/applications/[id]/resume` route (defends against path traversal); quality gates show green/red badges with readable labels.
+  - Action buttons rephrased to plain English ("Approve and move to Ready" / "Skip this job"; "Run Agent (send next Ready)" with hover tooltip).
+- **Quality gates notes** no longer start with stray `| ` (clean `noteParts.join(" | ")`).
+- **8 ready-to-send apps** at the end of the session, all with the new prompt + new resume. Tests: 73 passing.
+
 ## [2026-05-16] First live ingest+tailor cycle — fixed Apify input shape, Typst PATH, JSON parse
 
 - **Apify token added** to root `.env` and verified via 5-row ingest.

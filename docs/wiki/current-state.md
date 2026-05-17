@@ -1,6 +1,6 @@
 # Current state
 
-**Last updated:** 2026-05-16 (post first live ingest+tailor cycle)
+**Last updated:** 2026-05-17 (post UI overhaul + humanized cover letters)
 
 The "where are we right now" page. Updated whenever status changes. Read this before any work.
 
