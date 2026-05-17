@@ -25,9 +25,18 @@ numbers when later tailoring this bullet — invented numbers are misrepresentat
 
 Return ONLY valid JSON. No prose. No code fences.`;
 
-export async function extractResume(
-  pdfBytes: Uint8Array
-): Promise<ResumeStruct> {
+function parseExtractedJson(text: string): ResumeStruct {
+  const cleaned = text
+    .trim()
+    .replace(/^```(?:json)?\n?/, "")
+    .replace(/\n?```$/, "");
+  const start = cleaned.indexOf("{");
+  const end = cleaned.lastIndexOf("}");
+  const json = start >= 0 && end > start ? cleaned.slice(start, end + 1) : cleaned;
+  return ResumeStructSchema.parse(JSON.parse(json));
+}
+
+export async function extractResume(pdfBytes: Uint8Array): Promise<ResumeStruct> {
   const client = getAnthropic();
   const base64 = Buffer.from(pdfBytes).toString("base64");
 
@@ -41,11 +50,7 @@ export async function extractResume(
         content: [
           {
             type: "document",
-            source: {
-              type: "base64",
-              media_type: "application/pdf",
-              data: base64,
-            },
+            source: { type: "base64", media_type: "application/pdf", data: base64 },
           },
           { type: "text", text: "Extract this resume into the JSON schema above." },
         ],
@@ -57,11 +62,25 @@ export async function extractResume(
     .filter((c) => c.type === "text")
     .map((c) => (c as { text: string }).text)
     .join("");
+  return parseExtractedJson(text);
+}
 
-  const cleaned = text
-    .trim()
-    .replace(/^```(?:json)?\n?/, "")
-    .replace(/\n?```$/, "");
-  const parsed = JSON.parse(cleaned);
-  return ResumeStructSchema.parse(parsed);
+export async function extractResumeFromText(resumeText: string): Promise<ResumeStruct> {
+  const client = getAnthropic();
+  const response = await client.messages.create({
+    model: MODEL_SONNET,
+    max_tokens: 8000,
+    system: SYSTEM,
+    messages: [
+      {
+        role: "user",
+        content: `Extract this resume into the JSON schema above.\n\nResume text:\n\n${resumeText}`,
+      },
+    ],
+  });
+  const text = response.content
+    .filter((c) => c.type === "text")
+    .map((c) => (c as { text: string }).text)
+    .join("");
+  return parseExtractedJson(text);
 }
