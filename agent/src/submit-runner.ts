@@ -1,5 +1,5 @@
 import type { Client } from "@libsql/client";
-import { pickNextReady, getReadyById, markFailed } from "./state.js";
+import { pickNextReady, getReadyById, markFailed, markSubmitted } from "./state.js";
 import { connectToChrome } from "./chrome.js";
 import { fillGeneric, type FillContext, type FillResult } from "./form-fillers/generic.js";
 import { fillLinkedInEasyApply } from "./form-fillers/linkedin-easyapply.js";
@@ -11,8 +11,10 @@ export interface RunnerOptions {
   cdpUrl: string;
   db: Client;
   profileBasics: Record<string, string>;
-  // If set, run for this specific application id; otherwise pick the next ready one.
+  /** If set, run for this specific application id; otherwise pick the next ready one. */
   applicationId?: string;
+  /** When true, the agent clicks Submit after filling. Default: false (highlight only). */
+  autoSubmit?: boolean;
 }
 
 export interface RunnerResult {
@@ -43,6 +45,7 @@ export async function runOneApplication(opts: RunnerOptions): Promise<RunnerResu
     profileBasics: opts.profileBasics,
     qaAnswerFor: async (q) => findAnswer(opts.db, q),
     denyListMatch: async (q) => matchesDenyList(q, denyPatterns),
+    autoSubmit: opts.autoSubmit,
   };
 
   const chrome = await connectToChrome(opts.cdpUrl);
@@ -59,8 +62,22 @@ export async function runOneApplication(opts: RunnerOptions): Promise<RunnerResu
   }
 
   if (!result.ok) {
-    await markFailed(opts.db, app.id, result.reason ?? "filler returned not-ok", null);
+    await markFailed(
+      opts.db,
+      app.id,
+      result.reason ?? "filler returned not-ok",
+      result.screenshotPath ?? null,
+    );
     return { application_id: app.id, result, message: `FAILED: ${result.reason}` };
+  }
+
+  if (result.submitted) {
+    await markSubmitted(opts.db, app.id);
+    return {
+      application_id: app.id,
+      result,
+      message: `SUBMITTED — ${app.title} @ ${app.company_name}`,
+    };
   }
 
   return {

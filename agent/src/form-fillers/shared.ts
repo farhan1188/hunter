@@ -90,3 +90,85 @@ export async function highlightSubmit(page: Page): Promise<Locator | null> {
   }
   return null;
 }
+
+/**
+ * After-fill action: either highlight (human will click) or auto-submit (we
+ * click). Returns { submitted: true } on a click that appears successful.
+ *
+ * Success heuristics — any of:
+ *   - URL changed and the new page contains "thank you" / "application received" / "submitted"
+ *   - The previous Submit button is no longer visible AND no obvious error text
+ *
+ * Failure: stays as ok=false with a reason so the runner records submit_failed.
+ */
+export interface SubmitOptions {
+  autoSubmit: boolean;
+  /** Optional ms to wait after click for post-submit page to settle. */
+  postClickWaitMs?: number;
+}
+export interface SubmitOutcome {
+  ok: boolean;
+  submitted: boolean;
+  reason?: string;
+  /** Path to a screenshot taken AFTER the click attempt, for audit / debugging. */
+  screenshotPath?: string;
+}
+export async function finishForm(
+  page: Page,
+  applicationId: string,
+  options: SubmitOptions,
+): Promise<SubmitOutcome> {
+  const submitLoc = await highlightSubmit(page);
+  if (!submitLoc) {
+    return { ok: false, submitted: false, reason: "no Submit button found" };
+  }
+  if (!options.autoSubmit) {
+    return { ok: true, submitted: false };
+  }
+
+  const beforeUrl = page.url();
+  try {
+    await submitLoc.click({ timeout: 10_000 });
+  } catch (err) {
+    return {
+      ok: false,
+      submitted: false,
+      reason: `submit click failed: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  await page.waitForTimeout(options.postClickWaitMs ?? 4_000);
+
+  // Heuristic success check.
+  const afterUrl = page.url();
+  const bodyText = await page.locator("body").innerText().catch(() => "");
+  const looksSuccess =
+    /thank you|application received|application submitted|we received|successfully submitted/i.test(bodyText) ||
+    (afterUrl !== beforeUrl && !/error|invalid|failed/i.test(bodyText));
+  const looksError = /required|missing|invalid|error/i.test(bodyText.slice(0, 600)) && afterUrl === beforeUrl;
+
+  // Take a screenshot regardless so the user can audit.
+  let screenshotPath: string | undefined;
+  try {
+    const path = await import("node:path");
+    const os = await import("node:os");
+    const fs = await import("node:fs/promises");
+    const dir = path.join(os.tmpdir(), "job-hunter-submit-shots");
+    await fs.mkdir(dir, { recursive: true });
+    const file = path.join(dir, `${applicationId}-${Date.now()}.png`);
+    await page.screenshot({ path: file, fullPage: false });
+    screenshotPath = file;
+  } catch { /* non-fatal */ }
+
+  if (looksError && !looksSuccess) {
+    return { ok: false, submitted: false, reason: "form returned an error after submit", screenshotPath };
+  }
+  if (!looksSuccess) {
+    return {
+      ok: false,
+      submitted: false,
+      reason: "couldn't verify success after submit — leaving for manual review",
+      screenshotPath,
+    };
+  }
+  return { ok: true, submitted: true, screenshotPath };
+}

@@ -32,15 +32,38 @@ export async function fillLinkedInEasyApply(page: Page, ctx: FillContext): Promi
       return { ok: false, reason: stepResult.reason, qa_log: aggregateLog };
     }
 
-    // Click Next if present; if we see Submit / Review, stop.
+    // Click Next if present; if we see Submit / Review, decide based on autoSubmit.
     const submitLikeBtn = page.locator('button:has-text("Submit application"), button:has-text("Review")').first();
     if (await submitLikeBtn.count() > 0) {
-      // Highlight and stop.
-      await submitLikeBtn.evaluate((el: HTMLElement) => {
-        el.style.outline = "4px solid red";
-        el.style.outlineOffset = "2px";
-      });
-      return { ok: true, qa_log: aggregateLog };
+      if (!ctx.autoSubmit) {
+        // Highlight and stop — human will click.
+        await submitLikeBtn.evaluate((el: HTMLElement) => {
+          el.style.outline = "4px solid red";
+          el.style.outlineOffset = "2px";
+        });
+        return { ok: true, qa_log: aggregateLog, submitted: false };
+      }
+      // Click Review if that's the label; the next step usually has Submit.
+      const btnText = await submitLikeBtn.innerText();
+      await submitLikeBtn.click();
+      if (/review/i.test(btnText)) {
+        await page.waitForTimeout(1000);
+        const finalSubmit = page.locator('button:has-text("Submit application")').first();
+        if (await finalSubmit.count() === 0) {
+          return { ok: false, reason: "no final Submit after Review", qa_log: aggregateLog };
+        }
+        await finalSubmit.click();
+      }
+      await page.waitForTimeout(3000);
+      // Verify via post-submit modal text.
+      const body = await page.locator("body").innerText().catch(() => "");
+      const success = /application sent|done|your application was sent/i.test(body);
+      return {
+        ok: success,
+        reason: success ? undefined : "couldn't verify submit success",
+        qa_log: aggregateLog,
+        submitted: success,
+      };
     }
     const nextBtn = page.locator('button:has-text("Next")').first();
     if (await nextBtn.count() === 0) {

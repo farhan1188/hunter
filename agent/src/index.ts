@@ -9,13 +9,17 @@ async function main() {
   // target a specific app rather than always picking the next one.
   const arg = process.argv.find((a) => a.startsWith("--application-id="));
   const applicationId = arg ? arg.split("=")[1] : process.env.APPLICATION_ID;
+  // --auto-submit OR AUTO_SUBMIT=1 → click Submit after filling the form.
+  const autoSubmit = process.argv.includes("--auto-submit") || process.env.AUTO_SUBMIT === "1";
   console.log("Connecting to Chrome at", cfg.cdpUrl);
   if (applicationId) console.log("Targeting application:", applicationId);
+  if (autoSubmit) console.log("Auto-submit: ON (will click Submit)");
   const result = await runOneApplication({
     cdpUrl: cfg.cdpUrl,
     db,
     profileBasics: cfg.profileBasics,
     applicationId,
+    autoSubmit,
   });
   console.log("---");
   console.log(result.message);

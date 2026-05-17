@@ -1,18 +1,24 @@
 import type { Page, Locator } from "playwright-core";
 import type { ReadyApplication } from "../state.js";
-import { matchLabelToField, uploadResume, pasteCoverLetter, highlightSubmit } from "./shared.js";
+import { matchLabelToField, uploadResume, pasteCoverLetter, finishForm } from "./shared.js";
 
 export interface FillContext {
   application: ReadyApplication;
   profileBasics: Record<string, string>;
   qaAnswerFor(question: string): Promise<string | null>;
   denyListMatch(question: string): Promise<string | null>;
+  /** When true, after filling the form the agent clicks Submit. */
+  autoSubmit?: boolean;
 }
 
 export interface FillResult {
   ok: boolean;
   reason?: string;
   qa_log: Array<{ question: string; answer: string | null }>;
+  /** True only when autoSubmit was on AND the click succeeded. */
+  submitted?: boolean;
+  /** Path to a screenshot taken after the click (when autoSubmit was on). */
+  screenshotPath?: string;
 }
 
 /** Generic form filler — walks fields, routes to upload / paste / KB / deny-list / halt. */
@@ -77,10 +83,25 @@ export async function fillGeneric(page: Page, ctx: FillContext): Promise<FillRes
     await pasteCoverLetter(page, ctx.application.cover_letter_md);
   }
 
-  // 4) Highlight Submit.
-  const submitLoc = await highlightSubmit(page);
-  if (!submitLoc) return { ok: false, reason: "no Submit button found", qa_log: qaLog };
-  return { ok: true, qa_log: qaLog };
+  // 4) Submit (or highlight, depending on autoSubmit).
+  const outcome = await finishForm(page, ctx.application.id, {
+    autoSubmit: !!ctx.autoSubmit,
+  });
+  if (!outcome.ok) {
+    return {
+      ok: false,
+      reason: outcome.reason ?? "submit step failed",
+      qa_log: qaLog,
+      submitted: false,
+      screenshotPath: outcome.screenshotPath,
+    };
+  }
+  return {
+    ok: true,
+    qa_log: qaLog,
+    submitted: outcome.submitted,
+    screenshotPath: outcome.screenshotPath,
+  };
 }
 
 async function getFieldLabel(field: Locator): Promise<string | null> {

@@ -76,6 +76,8 @@ export interface AppSettings {
   submission_paused: boolean;
   cover_letter_max_words: number;
   quality_review_failure_mode: "review" | "auto_skip";
+  /** When true, the Run-round orchestrator clicks Submit after filling. */
+  autonomous_auto_submit: boolean;
 }
 
 export async function getSettings(): Promise<AppSettings> {
@@ -83,7 +85,8 @@ export async function getSettings(): Promise<AppSettings> {
     `SELECT id, daily_cap, weekly_cap, score_threshold, aggressiveness,
             token_budget_daily_usd, dry_run, default_target_timezone,
             cadence_floor_minutes, feed_show_country_specific,
-            submission_paused, cover_letter_max_words, quality_review_failure_mode
+            submission_paused, cover_letter_max_words, quality_review_failure_mode,
+            autonomous_auto_submit
      FROM settings WHERE id = 1`
   );
   const r = rows[0];
@@ -102,6 +105,7 @@ export async function getSettings(): Promise<AppSettings> {
     cover_letter_max_words: Number(r.cover_letter_max_words) || 250,
     quality_review_failure_mode:
       qrfm === "auto_skip" ? "auto_skip" : "review",
+    autonomous_auto_submit: Number(r.autonomous_auto_submit) === 1,
   };
 }
 
@@ -111,7 +115,8 @@ export async function saveSettings(s: AppSettings): Promise<void> {
       daily_cap=?, weekly_cap=?, score_threshold=?, aggressiveness=?,
       token_budget_daily_usd=?, dry_run=?, default_target_timezone=?,
       cadence_floor_minutes=?, feed_show_country_specific=?,
-      submission_paused=?, cover_letter_max_words=?, quality_review_failure_mode=?
+      submission_paused=?, cover_letter_max_words=?, quality_review_failure_mode=?,
+      autonomous_auto_submit=?
       WHERE id = 1`,
     args: [
       s.daily_cap,
@@ -126,6 +131,7 @@ export async function saveSettings(s: AppSettings): Promise<void> {
       s.submission_paused ? 1 : 0,
       s.cover_letter_max_words,
       s.quality_review_failure_mode,
+      s.autonomous_auto_submit ? 1 : 0,
     ],
   });
 }

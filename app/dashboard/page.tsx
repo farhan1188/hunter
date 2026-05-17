@@ -1,6 +1,8 @@
 import Link from "next/link";
 import { getDashboardStats } from "@/src/core/applications/query";
 import { getDb } from "@/src/db/client";
+import { getSettings } from "@/src/profile/store";
+import { RunRoundButton } from "./run-round-button";
 
 export const dynamic = "force-dynamic";
 
@@ -16,29 +18,40 @@ const ROUTINE_LABEL: Record<string, string> = {
 
 export default async function DashboardPage() {
   let stats: Awaited<ReturnType<typeof getDashboardStats>> | null = null;
+  let settings: Awaited<ReturnType<typeof getSettings>> | null = null;
   let dbError: string | null = null;
   try {
-    stats = await getDashboardStats(getDb());
+    [stats, settings] = await Promise.all([getDashboardStats(getDb()), getSettings()]);
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
   }
 
   const readyCount = stats?.current.ready ?? 0;
   const reviewCount = stats?.current.quality_review ?? 0;
+  const autoSubmit = !!settings?.autonomous_auto_submit && !settings?.submission_paused;
+  const paused = !!settings?.submission_paused;
 
   return (
     <main className="space-y-6">
       <div className="flex items-baseline justify-between">
         <h1 className="text-2xl font-bold">Dashboard</h1>
-        <div className="flex items-center gap-2">
-          <Link
-            href="/pipeline"
-            className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
-          >
-            Open pipeline →
-          </Link>
-        </div>
+        <Link
+          href="/pipeline"
+          className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium text-gray-700 hover:bg-gray-50"
+        >
+          Open pipeline →
+        </Link>
       </div>
+
+      {/* The one button that runs the entire pipeline. */}
+      <section className="rounded-lg border bg-white p-4">
+        <RunRoundButton autoSubmit={autoSubmit} />
+        {paused && (
+          <p className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+            <strong>Sending is paused.</strong> The button will run discovery and tailoring but won&apos;t send anything until you unpause in Settings.
+          </p>
+        )}
+      </section>
 
       {dbError && (
         <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">
