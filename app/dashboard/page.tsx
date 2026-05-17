@@ -1,24 +1,44 @@
 import Link from "next/link";
 import { getDashboardStats } from "@/src/core/applications/query";
-import { staleRoutines } from "@/src/lib/heartbeat";
 import { getDb } from "@/src/db/client";
 
 export const dynamic = "force-dynamic";
 
+const ROUTINE_LABEL: Record<string, string> = {
+  harvestapi: "Daily LinkedIn ingest",
+  tailor: "Tailor resumes + cover letters",
+  submit: "Auto-submit to ATS",
+  ingest: "Direct job-source crawl",
+  backup: "DB backup",
+  reconciler: "Cleanup stale jobs",
+  "notify-digest": "Digest email",
+};
+
 export default async function DashboardPage() {
   let stats: Awaited<ReturnType<typeof getDashboardStats>> | null = null;
-  let stale: string[] = [];
   let dbError: string | null = null;
   try {
-    const db = getDb();
-    [stats, stale] = await Promise.all([getDashboardStats(db), staleRoutines()]);
+    stats = await getDashboardStats(getDb());
   } catch (err) {
     dbError = err instanceof Error ? err.message : String(err);
   }
 
+  const readyCount = stats?.current.ready ?? 0;
+  const reviewCount = stats?.current.quality_review ?? 0;
+
   return (
     <main className="space-y-6">
-      <h1 className="text-2xl font-bold">Dashboard</h1>
+      <div className="flex items-baseline justify-between">
+        <h1 className="text-2xl font-bold">Dashboard</h1>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/pipeline"
+            className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700"
+          >
+            Open pipeline →
+          </Link>
+        </div>
+      </div>
 
       {dbError && (
         <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">
@@ -27,44 +47,57 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {stale.length > 0 && (
-        <div className="rounded border border-yellow-300 bg-yellow-50 p-3 text-sm">
-          Stale routines: {stale.join(", ")}
-        </div>
-      )}
-
       {stats && (
         <>
-          <section className="grid grid-cols-1 gap-3 sm:grid-cols-3 lg:grid-cols-5">
+          {/* Hero panel — what to act on RIGHT NOW */}
+          {readyCount > 0 || reviewCount > 0 ? (
+            <section className="rounded-lg border bg-white p-4">
+              <h2 className="text-sm font-semibold text-gray-500">Today</h2>
+              <div className="mt-2 flex flex-wrap items-baseline gap-x-6 gap-y-2">
+                {readyCount > 0 && (
+                  <Link href="/pipeline" className="group">
+                    <span className="text-3xl font-bold text-gray-900">{readyCount}</span>
+                    <span className="ml-2 text-sm text-gray-600 group-hover:text-gray-900">
+                      ready to send
+                    </span>
+                  </Link>
+                )}
+                {reviewCount > 0 && (
+                  <Link href="/pipeline" className="group">
+                    <span className="text-3xl font-bold text-yellow-700">{reviewCount}</span>
+                    <span className="ml-2 text-sm text-gray-600 group-hover:text-gray-900">
+                      need your review
+                    </span>
+                  </Link>
+                )}
+                <span className="text-sm text-gray-500">
+                  · {stats.last_24h.submitted} submitted in last 24h
+                </span>
+              </div>
+            </section>
+          ) : (
+            <section className="rounded-lg border border-dashed bg-white p-4 text-sm text-gray-600">
+              No applications waiting on you. New jobs flow in via the daily ingest;
+              run <code className="rounded bg-gray-100 px-1.5 py-0.5">npm run ingest:linkedin</code> to pull a fresh batch now.
+            </section>
+          )}
+
+          <section className="grid grid-cols-2 gap-3 sm:grid-cols-4">
             <Stat label="Jobs ingested (24h)" value={stats.last_24h.jobs_ingested} />
             <Stat label="Applications created (24h)" value={stats.last_24h.applications_created} />
+            <Stat label="In drafting now" value={stats.current.qualified + stats.current.tailoring} />
             <Stat label="Submitted (24h)" value={stats.last_24h.submitted} />
-            <Stat label="Ready" value={stats.current.ready} link="/pipeline" />
-            <Stat label="Needs review" value={stats.current.quality_review} link="/pipeline" />
           </section>
 
           <section>
-            <h2 className="mb-2 font-semibold">Funnel (current)</h2>
-            <table className="w-full text-sm">
-              <tbody>
-                <FunnelRow label="qualified"     count={stats.current.qualified} />
-                <FunnelRow label="tailoring"     count={stats.current.tailoring} />
-                <FunnelRow label="quality_review"count={stats.current.quality_review} />
-                <FunnelRow label="ready"         count={stats.current.ready} />
-                <FunnelRow label="submit_failed (24h)" count={stats.current.submit_failed_24h} />
-              </tbody>
-            </table>
-          </section>
-
-          <section>
-            <h2 className="mb-2 font-semibold">7-day trend</h2>
+            <h2 className="mb-2 text-sm font-semibold text-gray-500">7-day activity</h2>
             <table className="w-full text-sm">
               <thead className="text-left text-gray-500">
-                <tr><th>Date</th><th>Jobs ingested</th><th>Submitted</th></tr>
+                <tr><th className="py-1">Date</th><th>Jobs ingested</th><th>Submitted</th></tr>
               </thead>
               <tbody>
                 {stats.trend_7d.map((d) => (
-                  <tr key={d.date}>
+                  <tr key={d.date} className="border-t">
                     <td className="py-1">{d.date}</td>
                     <td className="font-mono">{d.jobs_ingested}</td>
                     <td className="font-mono">{d.submitted}</td>
@@ -79,21 +112,11 @@ export default async function DashboardPage() {
   );
 }
 
-function Stat({ label, value, link }: { label: string; value: number; link?: string }) {
-  const inner = (
-    <div className="rounded border bg-white p-3">
-      <div className="text-xs text-gray-500">{label}</div>
-      <div className="font-mono text-2xl">{value}</div>
-    </div>
-  );
-  return link ? <Link href={link}>{inner}</Link> : inner;
-}
-
-function FunnelRow({ label, count }: { label: string; count: number }) {
+function Stat({ label, value }: { label: string; value: number }) {
   return (
-    <tr className="border-t">
-      <td className="py-1">{label}</td>
-      <td className="font-mono">{count}</td>
-    </tr>
+    <div className="rounded-lg border bg-white p-3">
+      <div className="text-xs text-gray-500">{label}</div>
+      <div className="mt-1 font-mono text-2xl">{value}</div>
+    </div>
   );
 }

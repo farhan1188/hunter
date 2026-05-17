@@ -18,6 +18,7 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
     claim_equiv: null,
     verbatim_phrase: null,
   };
+  const noteParts: string[] = [];
 
   // Numerics
   const extraContext = [input.company_name ?? "", input.role_title ?? ""].join(" ");
@@ -26,7 +27,7 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
     extraContext
   );
   result.numerics = num.pass ? "pass" : "fail";
-  if (!num.pass) result.notes = `numerics: ${num.reason}`;
+  if (!num.pass) noteParts.push(`numerics: ${num.reason}`);
 
   // Claim equivalence
   const ce = await judgeAllPairs(
@@ -34,7 +35,7 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
   );
   result.claim_equiv = ce.pass ? "pass" : "fail";
   if (!ce.pass && ce.failure?.divergence_note) {
-    result.notes = (result.notes ?? "") + ` | claim_equiv: ${ce.failure.divergence_note}`;
+    noteParts.push(`claim_equiv: ${ce.failure.divergence_note}`);
   }
 
   // Verbatim phrase. If a phrase WAS fetched, enforce its presence (hard fail
@@ -44,13 +45,14 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
   if (input.verbatim_phrase) {
     result.verbatim_phrase = input.cover_letter.includes(input.verbatim_phrase) ? "pass" : "fail";
     if (result.verbatim_phrase === "fail") {
-      result.notes = (result.notes ?? "") + ` | verbatim_phrase: missing "${input.verbatim_phrase}"`;
+      noteParts.push(`verbatim_phrase: missing "${input.verbatim_phrase}"`);
     }
   } else {
     result.verbatim_phrase = "pass";
-    result.notes = (result.notes ?? "") + ` | verbatim_phrase: skipped (no company artifact)`;
+    noteParts.push(`verbatim_phrase: skipped (no company artifact)`);
   }
 
+  if (noteParts.length > 0) result.notes = noteParts.join(" | ");
   return result;
 }
 

@@ -87,14 +87,15 @@ async function main() {
         ? await fetchAndSelectVerbatimPhrase(app.apply_url)
         : null;
 
-      // e. Cover letter
+      // e. Cover letter (ground in top resume bullets so the model can reference real work)
       const coverLetter = await generateCoverLetter({
         profile_name: profile.basics.name ?? "",
         role_title: app.title,
         company_name: app.company_name,
-        jd_summary: app.description_md.slice(0, 800),
+        jd_summary: app.description_md.slice(0, 1200),
         verbatim_phrase: verbatim?.phrase ?? "",
         max_words: settings.cover_letter_max_words,
+        highlight_bullets: selectedBullets.slice(0, 4).map((b) => b.text),
       });
 
       // f. Build gates input

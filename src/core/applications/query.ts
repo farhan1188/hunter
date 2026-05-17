@@ -19,6 +19,8 @@ export interface PipelineRow {
   url: string;
   apply_url: string | null;
   posted_at: string;
+  location_raw: string | null;
+  location_remote: boolean;
   // Joined from scores.
   score: number | null;
   score_reasoning: string | null;
@@ -38,6 +40,7 @@ export async function listPipeline(
             a.id, a.job_id, a.state, a.channel, a.ats_vendor,
             a.failure_reason, a.submitted_at, a.created_at, a.updated_at,
             j.title, j.company_name, j.source, j.url, j.apply_url, j.posted_at,
+            j.location_raw, j.location_remote,
             s.value AS score, s.reasoning AS score_reasoning
           FROM applications a
           JOIN jobs j ON j.id = a.job_id
@@ -63,6 +66,8 @@ export async function listPipeline(
     url: r.url as string,
     apply_url: (r.apply_url as string) || null,
     posted_at: r.posted_at as string,
+    location_raw: (r.location_raw as string) || null,
+    location_remote: Number(r.location_remote) === 1,
     score: r.score !== null ? (r.score as number) : null,
     score_reasoning: (r.score_reasoning as string) || null,
   }));
@@ -88,7 +93,7 @@ export async function getApplicationDetail(
             a.failure_reason, a.failure_screenshot_path, a.submitted_at,
             a.created_at, a.updated_at,
             j.title, j.company_name, j.source, j.url, j.apply_url,
-            j.description_md, j.posted_at,
+            j.description_md, j.posted_at, j.location_raw, j.location_remote,
             s.value AS score, s.reasoning AS score_reasoning
           FROM applications a
           JOIN jobs j ON j.id = a.job_id
@@ -114,6 +119,8 @@ export async function getApplicationDetail(
     url: r.url as string,
     apply_url: (r.apply_url as string) || null,
     posted_at: r.posted_at as string,
+    location_raw: (r.location_raw as string) || null,
+    location_remote: Number(r.location_remote) === 1,
     score: r.score !== null ? (r.score as number) : null,
     score_reasoning: (r.score_reasoning as string) || null,
     resume_pdf_path: (r.resume_pdf_path as string) || null,

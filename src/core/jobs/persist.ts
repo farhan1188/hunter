@@ -11,6 +11,15 @@ export async function insertJobs(
 ): Promise<number> {
   if (postings.length === 0) return 0;
 
+  // Dedupe within the batch — the same LinkedIn job can surface in multiple
+  // search queries within one ingest run, producing duplicate ids.
+  const seen = new Set<string>();
+  postings = postings.filter((p) => {
+    if (seen.has(p.id)) return false;
+    seen.add(p.id);
+    return true;
+  });
+
   // Look up which IDs already exist so we know what's new vs an update.
   const ids = postings.map((p) => p.id);
   const placeholders = ids.map(() => "?").join(",");

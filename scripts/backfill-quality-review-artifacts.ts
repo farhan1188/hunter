@@ -21,13 +21,17 @@ async function main() {
 
   const force = process.argv.includes("--force");
   const promote = process.argv.includes("--promote-passing-gates");
-  const { rows } = await db.execute(
-    `SELECT a.id, a.job_id, a.ats_vendor, j.title, j.company_name, j.description_md
-     FROM applications a
-     JOIN jobs j ON j.id = a.job_id
-     WHERE a.state = 'quality_review'
-       ${force ? "" : "AND (a.cover_letter_md IS NULL OR a.resume_pdf_path IS NULL)"}`,
-  );
+  const stateArg = process.argv.find((a) => a.startsWith("--state="));
+  const state = stateArg ? stateArg.split("=")[1] : "quality_review";
+  const { rows } = await db.execute({
+    sql: `SELECT a.id, a.job_id, a.ats_vendor, j.title, j.company_name, j.description_md
+          FROM applications a
+          JOIN jobs j ON j.id = a.job_id
+          WHERE a.state = ?
+            ${force ? "" : "AND (a.cover_letter_md IS NULL OR a.resume_pdf_path IS NULL)"}`,
+    args: [state],
+  });
+  console.log(`State filter: ${state} (--force=${force}, --promote-passing-gates=${promote})`);
 
   console.log(`Backfilling ${rows.length} app(s)...`);
 
@@ -40,19 +44,20 @@ async function main() {
     const pdfFilename = `resume-${id}.pdf`;
     const pdfExists = existsSync(path.join(TMP_DIR, pdfFilename));
 
-    const cover = await generateCoverLetter({
-      profile_name: profile.basics.name ?? "",
-      role_title: title,
-      company_name: company,
-      jd_summary: jd.slice(0, 800),
-      verbatim_phrase: "",
-      max_words: settings.cover_letter_max_words,
-    });
-
     // Re-run gates against the relaxed logic (numerics + verbatim soft-pass)
     const selectedBullets = profile.resume_struct
       ? selectBullets(profile.resume_struct, jd, 8)
       : [];
+
+    const cover = await generateCoverLetter({
+      profile_name: profile.basics.name ?? "",
+      role_title: title,
+      company_name: company,
+      jd_summary: jd.slice(0, 1200),
+      verbatim_phrase: "",
+      max_words: settings.cover_letter_max_words,
+      highlight_bullets: selectedBullets.slice(0, 4).map((b) => b.text),
+    });
     const gates = await runQualityGates({
       tailored_bullets: selectedBullets.map((b) => ({
         tailored: b.text,
