@@ -1,5 +1,5 @@
 import type { Client } from "@libsql/client";
-import { pickNextReady, markFailed } from "./state.js";
+import { pickNextReady, getReadyById, markFailed } from "./state.js";
 import { connectToChrome } from "./chrome.js";
 import { fillGeneric, type FillContext, type FillResult } from "./form-fillers/generic.js";
 import { fillLinkedInEasyApply } from "./form-fillers/linkedin-easyapply.js";
@@ -11,6 +11,8 @@ export interface RunnerOptions {
   cdpUrl: string;
   db: Client;
   profileBasics: Record<string, string>;
+  // If set, run for this specific application id; otherwise pick the next ready one.
+  applicationId?: string;
 }
 
 export interface RunnerResult {
@@ -20,8 +22,18 @@ export interface RunnerResult {
 }
 
 export async function runOneApplication(opts: RunnerOptions): Promise<RunnerResult> {
-  const app = await pickNextReady(opts.db);
-  if (!app) return { application_id: null, result: null, message: "no ready applications" };
+  const app = opts.applicationId
+    ? await getReadyById(opts.db, opts.applicationId)
+    : await pickNextReady(opts.db);
+  if (!app) {
+    return {
+      application_id: opts.applicationId ?? null,
+      result: null,
+      message: opts.applicationId
+        ? `application ${opts.applicationId} is not ready (already sent, dismissed, or doesn't exist)`
+        : "no ready applications",
+    };
+  }
 
   const kb = await listKb(opts.db);
   const denyPatterns = kb.filter((e) => e.deny_list).map((e) => e.pattern);

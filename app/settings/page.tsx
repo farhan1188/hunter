@@ -6,9 +6,7 @@ import { AdaptersList } from "./adapters-list";
 export const dynamic = "force-dynamic";
 
 export default async function SettingsPage() {
-  const apifyStatus = process.env.APIFY_API_TOKEN
-    ? "set"
-    : "missing — add APIFY_API_TOKEN to .env";
+  const apifyConnected = !!process.env.APIFY_API_TOKEN;
 
   let settings;
   let adapters;
@@ -27,13 +25,9 @@ export default async function SettingsPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">Settings</h1>
         <span className="text-xs text-gray-500">
-          APIFY_API_TOKEN:{" "}
-          <span
-            className={
-              apifyStatus === "set" ? "text-green-600" : "text-red-600"
-            }
-          >
-            {apifyStatus}
+          LinkedIn (via Apify):{" "}
+          <span className={apifyConnected ? "text-green-600" : "text-red-600"}>
+            {apifyConnected ? "connected" : "not connected (add a token to .env)"}
           </span>
         </span>
       </div>

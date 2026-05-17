@@ -13,6 +13,16 @@ import { RunNowButton } from "./run-now-button";
 
 export const dynamic = "force-dynamic";
 
+function visaLabel(c: string | undefined | null): string {
+  switch (c) {
+    case "international_remote": return "Remote worldwide";
+    case "sponsorship_offered": return "Sponsorship offered";
+    case "country_specific": return "Specific country only";
+    case "unknown": return "Visa unclear";
+    default: return c ?? "";
+  }
+}
+
 export default async function FeedPage({
   searchParams,
 }: {
@@ -144,11 +154,11 @@ export default async function FeedPage({
                       : "secondary"
                   }
                 >
-                  {r.visa.category}
+                  {visaLabel(r.visa.category)}
                 </Badge>
                 {r.visa.target_countries.length > 0 && (
                   <div className="mt-1 text-xs text-gray-500">
-                    {r.visa.target_countries.join(", ")}
+                    {r.visa.target_countries.map((c) => c.toUpperCase()).join(", ")}
                   </div>
                 )}
               </td>

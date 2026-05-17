@@ -3,6 +3,7 @@ import { selectBullets } from "@/src/core/tailor/bullet-selection";
 import type { ResumeStruct } from "@/src/core/types";
 
 const resume: ResumeStruct = {
+  summary: "",
   experience: [
     {
       company: "Acme", title: "PM", start: "2022", end: "2024",

@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import type { Preferences } from "@/src/core/types";
+import { CountryPicker } from "./country-picker";
 
 export function PreferencesForm({ initial }: { initial: Preferences }) {
   const [prefs, setPrefs] = useState(initial);
@@ -49,36 +50,22 @@ export function PreferencesForm({ initial }: { initial: Preferences }) {
       </div>
 
       <div>
-        <Label>Work-auth countries (ISO codes, comma-separated)</Label>
-        <Input
-          value={prefs.work_auth_countries.join(", ")}
-          onChange={(e) =>
-            setPrefs((p) => ({
-              ...p,
-              work_auth_countries: e.target.value
-                .split(",")
-                .map((s) => s.trim().toLowerCase())
-                .filter(Boolean),
-            }))
+        <Label>Countries where I can work today (citizenship / current visa)</Label>
+        <CountryPicker
+          selected={prefs.work_auth_countries}
+          onChange={(next) =>
+            setPrefs((p) => ({ ...p, work_auth_countries: next }))
           }
-          placeholder="pk"
         />
       </div>
 
       <div>
-        <Label>Open to sponsorship in (ISO codes)</Label>
-        <Input
-          value={prefs.open_to_sponsorship_countries.join(", ")}
-          onChange={(e) =>
-            setPrefs((p) => ({
-              ...p,
-              open_to_sponsorship_countries: e.target.value
-                .split(",")
-                .map((s) => s.trim().toLowerCase())
-                .filter(Boolean),
-            }))
+        <Label>Countries I'd accept sponsorship for</Label>
+        <CountryPicker
+          selected={prefs.open_to_sponsorship_countries}
+          onChange={(next) =>
+            setPrefs((p) => ({ ...p, open_to_sponsorship_countries: next }))
           }
-          placeholder="us, uk, ca, de, nl, ie, au, ae, sg"
         />
       </div>
 

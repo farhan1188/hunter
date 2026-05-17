@@ -35,7 +35,7 @@ export default async function ProfilePage() {
         <h2 className="font-semibold">Resume</h2>
         {profile?.resume_file ? (
           <p className="mt-2 text-sm text-gray-600">
-            <code>{profile.resume_file.filename}</code> — uploaded{" "}
+            <strong>{profile.resume_file.filename}</strong>, uploaded{" "}
             {new Date(profile.resume_file.uploaded_at).toLocaleString()}
           </p>
         ) : (
@@ -45,9 +45,9 @@ export default async function ProfilePage() {
         )}
         {profile?.resume_struct && (
           <p className="mt-1 text-xs text-gray-500">
-            Extracted: {profile.resume_struct.experience.length} roles ·{" "}
-            {profile.resume_struct.projects.length} projects ·{" "}
-            {profile.resume_struct.skills.primary.length} primary skills
+            Parsed {profile.resume_struct.experience.length} roles,{" "}
+            {profile.resume_struct.projects.length} project{profile.resume_struct.projects.length === 1 ? "" : "s"},{" "}
+            and {profile.resume_struct.skills.primary.length} core skills.
           </p>
         )}
         <div className="mt-4">

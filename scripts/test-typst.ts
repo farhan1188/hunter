@@ -9,6 +9,7 @@ async function main() {
       { text: "Did a thing", numbers: [], source_company: "Acme", source_title: "PM", score: 0 },
     ],
     resume: {
+      summary: "",
       experience: [{ company: "Acme", title: "PM", start: "2020", end: "2024", bullets: [{ text: "Did a thing", numbers: [] }] }],
       projects: [], skills: { primary: ["product"], secondary: [] }, education: [],
     },

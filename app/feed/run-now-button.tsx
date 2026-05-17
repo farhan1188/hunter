@@ -81,57 +81,67 @@ export function RunNowButton() {
       <Button
         variant="outline"
         disabled={!!busy}
-        onClick={() => run("Crawl", "/api/crawl")}
+        onClick={() => run("Fetch jobs", "/api/crawl")}
+        title="Pull fresh postings from the direct job-source adapters (RemoteOK, Honeypot, Greenhouse, etc.) right now."
       >
-        {busy?.startsWith("Crawl") ? busy : "Crawl"}
+        {busy?.startsWith("Fetch") ? busy : "Fetch jobs"}
       </Button>
       <Button
         variant="outline"
         disabled={!!busy}
         onClick={() =>
-          run("Reclassify", "/api/reclassify", {
-            progressKey: "classified",
-            remainingKey: "remaining",
-          })
-        }
-      >
-        {busy?.startsWith("Reclassify") ? busy : "Reclassify"}
-      </Button>
-      <Button
-        variant="outline"
-        disabled={!!busy}
-        onClick={() =>
-          run("Annotate", "/api/annotate", { progressKey: "annotated" })
-        }
-      >
-        {busy?.startsWith("Annotate") ? busy : "Annotate"}
-      </Button>
-      <Button
-        variant="outline"
-        disabled={!!busy}
-        onClick={() =>
-          run("Score", "/api/score", {
+          run("Score new", "/api/score", {
             progressKey: "scored",
             remainingKey: "remaining",
           })
         }
+        title="Rank any unscored jobs against your profile."
       >
-        {busy?.startsWith("Score") ? busy : "Score"}
+        {busy?.startsWith("Score new") ? busy : "Score new"}
       </Button>
-      <Button
-        variant="outline"
-        disabled={!!busy}
-        onClick={() =>
-          run("Re-score all", "/api/score?all=true", {
-            progressKey: "scored",
-            remainingKey: "remaining",
-            confirm:
-              "Wipe all existing scores and re-rank every job from scratch? Use after resume/preferences/scoring-prompt changes.",
-          })
-        }
-      >
-        {busy?.startsWith("Re-score") ? busy : "Re-score all"}
-      </Button>
+      <details className="text-xs text-gray-500">
+        <summary className="cursor-pointer">More</summary>
+        <div className="mt-2 flex flex-wrap gap-2">
+          <Button
+            variant="outline"
+            disabled={!!busy}
+            onClick={() =>
+              run("Tag visa info", "/api/annotate", { progressKey: "annotated" })
+            }
+            title="Classify visa category (remote / sponsorship / country-specific) on any jobs missing it."
+          >
+            {busy?.startsWith("Tag") ? busy : "Tag visa info"}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!!busy}
+            onClick={() =>
+              run("Re-check fit", "/api/reclassify", {
+                progressKey: "classified",
+                remainingKey: "remaining",
+              })
+            }
+            title="Re-evaluate match category for older jobs (use after major target-role changes)."
+          >
+            {busy?.startsWith("Re-check") ? busy : "Re-check fit"}
+          </Button>
+          <Button
+            variant="outline"
+            disabled={!!busy}
+            onClick={() =>
+              run("Re-score everything", "/api/score?all=true", {
+                progressKey: "scored",
+                remainingKey: "remaining",
+                confirm:
+                  "Wipe all existing scores and re-rank every job from scratch? Use after changing your resume or preferences.",
+              })
+            }
+            title="Wipe and re-rank EVERY job. Use after a resume or preferences change."
+          >
+            {busy?.startsWith("Re-score") ? busy : "Re-score everything"}
+          </Button>
+        </div>
+      </details>
       {status && <span className="text-xs text-gray-600">{status}</span>}
     </div>
   );

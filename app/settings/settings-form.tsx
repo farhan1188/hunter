@@ -35,8 +35,7 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
           onCheckedChange={(v) => setS({ ...s, submission_paused: v })}
         />
         <Label className="font-semibold text-red-700">
-          Submission paused (kill switch — overrides auto_submit on all
-          adapters)
+          Pause all sending. Overrides every per-source setting until turned off.
         </Label>
       </div>
       <div>
@@ -56,7 +55,9 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
         />
       </div>
       <div>
-        <Label>Score threshold for auto-actions</Label>
+        <Label title="Jobs scoring below this are skipped automatically. 0-100.">
+          Minimum match score to auto-apply (0-100)
+        </Label>
         <Input
           type="number"
           value={s.score_threshold}
@@ -66,7 +67,9 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
         />
       </div>
       <div>
-        <Label>Aggressiveness (0–100)</Label>
+        <Label title="How willing the system is to apply to borderline jobs. Higher = applies to weaker matches too. 0-100.">
+          How aggressive to be (0-100)
+        </Label>
         <Input
           type="number"
           value={s.aggressiveness}
@@ -76,7 +79,9 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
         />
       </div>
       <div>
-        <Label>Token budget daily (USD)</Label>
+        <Label title="Hard cap on API spend per day across scoring, tailoring, and cover letters.">
+          Daily AI budget (USD)
+        </Label>
         <Input
           type="number"
           step="0.5"
@@ -87,7 +92,9 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
         />
       </div>
       <div>
-        <Label>Cadence floor (min)</Label>
+        <Label title="Minimum minutes between auto-submissions to avoid looking spammy.">
+          Wait between auto-sends (minutes)
+        </Label>
         <Input
           type="number"
           value={s.cadence_floor_minutes}
@@ -101,7 +108,7 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
           checked={s.dry_run}
           onCheckedChange={(v) => setS({ ...s, dry_run: v })}
         />
-        <Label>Dry-run mode (no real submissions)</Label>
+        <Label>Practice mode (pretends to send, doesn&apos;t actually submit)</Label>
       </div>
       <div className="flex items-center gap-2">
         <Switch
@@ -123,7 +130,7 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
         />
       </div>
       <div>
-        <Label>Quality review failure mode</Label>
+        <Label>When a quality check fails</Label>
         <select
           className="mt-1 w-full rounded border border-gray-300 bg-white px-2 py-1 text-sm"
           value={s.quality_review_failure_mode}
@@ -136,8 +143,8 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
             })
           }
         >
-          <option value="review">review (hold for human)</option>
-          <option value="auto_skip">auto_skip (discard silently)</option>
+          <option value="review">Hold for me to review</option>
+          <option value="auto_skip">Skip the job silently</option>
         </select>
       </div>
 

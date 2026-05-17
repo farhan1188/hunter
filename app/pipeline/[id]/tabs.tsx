@@ -5,11 +5,46 @@ import { useRouter } from "next/navigation";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import type { ApplicationDetail } from "@/src/core/applications/query";
 
+// User-facing gate labels + one-line explanations. The internal keys
+// (numerics, claim_equiv, verbatim_phrase) stay in the DB; this map is the
+// translation for what shows up in the UI.
+const GATE_LABELS: Record<string, { label: string; help: string }> = {
+  numerics: {
+    label: "Numbers stay honest",
+    help: "Every number in your tailored bullets comes from your resume, your company name, or your role title. Nothing invented.",
+  },
+  claim_equiv: {
+    label: "No exaggerated claims",
+    help: "Each tailored bullet says the same thing as the original on your resume. No drift in scope, ownership, or results.",
+  },
+  verbatim_phrase: {
+    label: "Cover letter references the company",
+    help: "Quotes a phrase from the company's own materials to show the letter was written for them specifically.",
+  },
+};
+
+// Make gate notes human. Strip leading separators, replace snake_case keys,
+// replace internal terms.
+function humanizeNote(raw: string | undefined | null): string {
+  if (!raw) return "";
+  return raw
+    .replace(/^\s*\|\s*/, "")
+    .replace(/\s\|\s/g, " · ")
+    .replace(/numerics:/g, "Numbers:")
+    .replace(/claim_equiv:/g, "Claims:")
+    .replace(/verbatim_phrase:\s*skipped\s*\(no company artifact\)/gi,
+      "Cover letter: didn't quote the company directly (we couldn't find a clean phrase on their site)")
+    .replace(/verbatim_phrase:\s*missing\s*"([^"]+)"/g,
+      'Cover letter: missing the quoted phrase "$1"')
+    .replace(/verbatim_phrase:/g, "Cover letter:");
+}
+
 export function DetailTabs({ application }: { application: ApplicationDetail }) {
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [coverCopied, setCoverCopied] = useState(false);
+  const [agentResult, setAgentResult] = useState<{ ok: boolean; output: string } | null>(null);
   const [outreachDraft, setOutreachDraft] = useState<string | null>(null);
   const [outreachBusy, setOutreachBusy] = useState(false);
   const [outreachCopied, setOutreachCopied] = useState(false);
@@ -26,6 +61,27 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
       const data = await res.json();
       if (!res.ok) setError(data.error ?? `HTTP ${res.status}`);
       else router.refresh();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : String(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function sendInChrome() {
+    setBusy(true);
+    setError(null);
+    setAgentResult(null);
+    try {
+      const res = await fetch(`/api/agent/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ application_id: application.id }),
+      });
+      const data = await res.json();
+      const output = [data.stdout, data.stderr, data.error].filter(Boolean).join("\n");
+      setAgentResult({ ok: !!data.ok, output });
+      router.refresh();
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err));
     } finally {
@@ -58,7 +114,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
 
   return (
     <div className="space-y-4">
-      {/* Action bar — state-aware, plain-English labels */}
+      {/* Action bar — actual buttons, not instructions to go elsewhere */}
       <div className="flex flex-wrap items-center gap-2">
         {application.state === "quality_review" && (
           <>
@@ -66,28 +122,38 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
               className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
               disabled={busy}
               onClick={() => act(`/api/applications/${application.id}/review`, { action: "accept" })}
-              title="Override the quality gates and move this app to Ready so it can be sent."
+              title="Mark this approved and queue it to send, even though some quality checks didn't pass."
             >
-              Approve and move to Ready
+              Approve and queue
             </button>
             <button
               className="rounded border border-gray-300 bg-white px-3 py-1.5 text-sm hover:bg-gray-50 disabled:opacity-50"
               disabled={busy}
               onClick={() => act(`/api/applications/${application.id}/review`, { action: "dismiss" })}
-              title="Skip this job. It won't appear in the pipeline again."
+              title="Skip this job. It won't reappear in the pipeline."
             >
-              Skip this job
+              Skip
             </button>
           </>
         )}
         {application.state === "ready" && application.channel === "local_agent" && (
-          <span className="text-sm text-gray-600">
-            Click <span className="font-mono">Run Agent</span> on the Pipeline page (or run <code className="rounded bg-gray-100 px-1.5 py-0.5">npm run agent</code>) to open this in Chrome and fill the form.
-          </span>
+          <>
+            <button
+              className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              disabled={busy}
+              onClick={sendInChrome}
+              title="Opens this job in your Job Hunter Chrome window, fills the application form, and stops before clicking Submit so you can review."
+            >
+              {busy ? "Opening in Chrome…" : "Open in Chrome and fill the form"}
+            </button>
+            <span className="text-xs text-gray-500">
+              The form gets filled. You review and click Submit yourself.
+            </span>
+          </>
         )}
         {application.state === "ready" && application.channel === "ats_native" && (
           <span className="text-sm text-gray-600">
-            Will auto-submit on the next Submit routine run.
+            Queued for the auto-submitter. Runs every 15 minutes once the cloud routine is deployed.
           </span>
         )}
         {application.state === "submit_failed" && (
@@ -102,17 +168,29 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
         {error && <span className="text-xs text-red-600">{error}</span>}
       </div>
 
+      {agentResult && (
+        <details className="rounded border bg-gray-50 p-2 text-xs">
+          <summary className={`cursor-pointer ${agentResult.ok ? "text-green-700" : "text-red-700"}`}>
+            {agentResult.ok
+              ? "✓ Form filled in Chrome. Switch to your Chrome window, review, and click Submit."
+              : "✗ Agent failed (click for output)"}
+          </summary>
+          <pre className="mt-1 max-h-64 overflow-auto rounded bg-white p-2">
+            {agentResult.output || "(no output)"}
+          </pre>
+        </details>
+      )}
+
       <Tabs defaultValue="cover">
         <TabsList>
           <TabsTrigger value="cover">Cover letter</TabsTrigger>
           <TabsTrigger value="resume">Resume</TabsTrigger>
-          <TabsTrigger value="gates">Quality gates</TabsTrigger>
+          <TabsTrigger value="gates">Quality check</TabsTrigger>
           <TabsTrigger value="qa">Q&A</TabsTrigger>
           <TabsTrigger value="jd">Job description</TabsTrigger>
           <TabsTrigger value="outreach">Outreach DM</TabsTrigger>
         </TabsList>
 
-        {/* Cover letter — rendered as actual paragraphs with a Copy button */}
         <TabsContent value="cover">
           {application.cover_letter_md ? (
             <div className="space-y-2">
@@ -140,7 +218,6 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
           )}
         </TabsContent>
 
-        {/* Resume — embedded PDF preview */}
         <TabsContent value="resume">
           {resumeUrl ? (
             <div className="space-y-2">
@@ -180,41 +257,49 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
           )}
         </TabsContent>
 
-        {/* Quality gates — colored badges */}
         <TabsContent value="gates">
           {gates ? (
-            <div className="space-y-2">
-              <ul className="space-y-1">
+            <div className="space-y-3">
+              <p className="text-xs text-gray-500">
+                Three automated checks we run before queuing an application. All pass means the content meets a high bar; failures mean the system caught something worth a second look.
+              </p>
+              <ul className="space-y-2">
                 {Object.entries(gates)
                   .filter(([k]) => k !== "notes")
                   .map(([k, v]) => {
                     const status = String(v);
+                    const info = GATE_LABELS[k] ?? { label: k.replace(/_/g, " "), help: "" };
                     const color =
                       status === "pass"
                         ? "bg-green-100 text-green-800"
                         : status === "fail"
                         ? "bg-red-100 text-red-800"
                         : "bg-gray-100 text-gray-700";
+                    const dot = status === "pass" ? "✓" : status === "fail" ? "✗" : "·";
                     return (
-                      <li key={k} className="flex items-center gap-3 text-sm">
+                      <li key={k} className="flex items-start gap-3 text-sm">
                         <span
-                          className={`inline-flex w-14 justify-center rounded px-2 py-0.5 text-xs font-medium ${color}`}
+                          className={`inline-flex w-7 shrink-0 items-center justify-center rounded px-1 py-0.5 text-xs font-semibold ${color}`}
+                          title={status}
                         >
-                          {status}
+                          {dot}
                         </span>
-                        <span className="text-gray-700">{k.replace(/_/g, " ")}</span>
+                        <div className="space-y-0.5">
+                          <div className="font-medium text-gray-900">{info.label}</div>
+                          <div className="text-xs text-gray-600">{info.help}</div>
+                        </div>
                       </li>
                     );
                   })}
               </ul>
               {typeof gates.notes === "string" && gates.notes.trim().length > 0 && (
                 <div className="rounded border border-yellow-200 bg-yellow-50 p-2 text-xs text-yellow-900">
-                  {gates.notes}
+                  {humanizeNote(gates.notes as string)}
                 </div>
               )}
             </div>
           ) : (
-            <p className="text-sm text-gray-500">No quality-gate result yet.</p>
+            <p className="text-sm text-gray-500">No quality check has run yet for this application.</p>
           )}
           {application.failure_reason && (
             <div className="mt-2 rounded border border-red-300 bg-red-50 p-2 text-xs text-red-900">
@@ -235,7 +320,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
             </ul>
           ) : (
             <p className="text-sm text-gray-500">
-              No Q&A entries yet. Application questions you answer (visa, salary, etc.) are saved here for reuse.
+              No application questions answered yet. Any questions you answer (visa, salary, etc.) are saved here so the next form fills itself.
             </p>
           )}
         </TabsContent>

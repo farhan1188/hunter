@@ -6,15 +6,24 @@ export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 export const maxDuration = 300; // 5 min cap
 
-export async function POST() {
+export async function POST(req: Request) {
+  // Optional { application_id } in the JSON body — when present, the agent
+  // targets that specific app instead of picking the next ready one.
+  let applicationId: string | undefined;
+  try {
+    const body = await req.json().catch(() => ({}));
+    if (typeof body?.application_id === "string") applicationId = body.application_id;
+  } catch { /* no body is fine */ }
+
   return new Promise<NextResponse>((resolve) => {
     const agentDir = path.join(process.cwd(), "agent");
-    // Use the platform-correct npm command (npm.cmd on Windows).
     const isWindows = process.platform === "win32";
     const cmd = isWindows ? "npm.cmd" : "npm";
-    const proc = spawn(cmd, ["run", "agent"], {
+    const args = ["run", "agent"];
+    if (applicationId) args.push("--", `--application-id=${applicationId}`);
+    const proc = spawn(cmd, args, {
       cwd: agentDir,
-      env: process.env,
+      env: { ...process.env, ...(applicationId ? { APPLICATION_ID: applicationId } : {}) },
       shell: false,
     });
     let stdout = "";
