@@ -10,6 +10,7 @@
 import type { Page, Locator } from "playwright-core";
 import type { FillContext, FillResult } from "./generic.js";
 import { uploadResume, finishForm } from "./shared.js";
+import { handleRecaptchaIfPresent } from "./captcha-handle.js";
 
 async function fillTypeahead(
   page: Page,
@@ -152,7 +153,14 @@ export async function fillLever(page: Page, ctx: FillContext): Promise<FillResul
     return { ok: false, reason: `Lever required custom question with no auto-answer: "${label}"`, qa_log: qaLog };
   }
 
-  // 6) Submit (or highlight).
+  // 6) Solve reCAPTCHA if present, then Submit.
+  if (ctx.autoSubmit) {
+    try {
+      await handleRecaptchaIfPresent(page);
+    } catch (err) {
+      console.warn(`[lever] captcha handler failed (continuing): ${(err as Error).message}`);
+    }
+  }
   const outcome = await finishForm(page, ctx.application.id, {
     autoSubmit: !!ctx.autoSubmit,
     postClickWaitMs: 6000,

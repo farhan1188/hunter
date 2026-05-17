@@ -1,6 +1,23 @@
 import type { Page, Locator } from "playwright-core";
+import { existsSync } from "node:fs";
+import path from "node:path";
 import type { ReadyApplication } from "../state.js";
 import { matchLabelToField, uploadResume, pasteCoverLetter, finishForm } from "./shared.js";
+import { handleRecaptchaIfPresent } from "./captcha-handle.js";
+
+/** Resolve `cover-<appId>.pdf` against the project tmp dir. The tailor writes
+ *  there alongside the resume; agent runs from `agent/` so we climb one level. */
+function resolveCoverLetterPath(appId: string): string | null {
+  const filename = `cover-${appId}.pdf`;
+  const candidates = [
+    path.resolve(process.cwd(), filename),
+    path.resolve(process.cwd(), "..", "tmp", filename),
+    path.resolve(process.cwd(), "tmp", filename),
+    path.resolve(process.cwd(), "..", filename),
+  ];
+  for (const c of candidates) if (existsSync(c)) return c;
+  return null;
+}
 
 export interface FillContext {
   application: ReadyApplication;
@@ -25,9 +42,83 @@ export interface FillResult {
 export async function fillGeneric(page: Page, ctx: FillContext): Promise<FillResult> {
   const qaLog: FillResult["qa_log"] = [];
 
+  // 0) If we landed on a job-description page with an "Apply" CTA but no
+  // visible form inputs, click the CTA so the actual form loads. Patterns:
+  // BairesDev, Watermark/Dayforce, many custom careers pages.
+  const initialInputCount = await page.locator(
+    'input:visible:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea:visible, select:visible',
+  ).count();
+  if (initialInputCount < 3) {
+    const applySelectors = [
+      'button:has-text("Apply for this position")',
+      'button:has-text("Apply for this job")',
+      'button:has-text("Apply Now")',
+      'button:has-text("Apply now")',
+      'a:has-text("Apply for this position")',
+      'a:has-text("Apply Now")',
+      'button[aria-label^="Apply" i]',
+      'a[aria-label^="Apply" i]',
+      'button.apply-btn',
+      'a.apply-btn',
+      'button:text-is("Apply")',
+      'a:text-is("Apply")',
+    ];
+    for (const sel of applySelectors) {
+      const btn = page.locator(sel).first();
+      if ((await btn.count()) > 0 && (await btn.isVisible().catch(() => false))) {
+        await btn.click({ timeout: 5000 }).catch(() => null);
+        await page.waitForLoadState("domcontentloaded", { timeout: 12_000 }).catch(() => {});
+        await page.waitForTimeout(1500);
+        // Some flows show a "Apply without account" choice next
+        const noAcct = page.locator(
+          'button:has-text("Apply without an Account"), button:has-text("Continue as Guest"), button:has-text("Apply Without Account")',
+        ).first();
+        if ((await noAcct.count()) > 0 && (await noAcct.isVisible().catch(() => false))) {
+          await noAcct.click({ timeout: 5000 }).catch(() => null);
+          await page.waitForLoadState("domcontentloaded", { timeout: 12_000 }).catch(() => {});
+          await page.waitForTimeout(1500);
+        }
+        break;
+      }
+    }
+  }
+
+  // 0b) Dismiss cookie banners that block click interactions.
+  const cookieAcceptSelectors = [
+    'button:has-text("Accept All Cookies")',
+    'button:has-text("Accept all")',
+    'button#onetrust-accept-btn-handler',
+    'button:has-text("Accept"):visible',
+    'button:has-text("I Agree")',
+  ];
+  for (const sel of cookieAcceptSelectors) {
+    const c = page.locator(sel).first();
+    if ((await c.count()) > 0 && (await c.isVisible().catch(() => false))) {
+      await c.click({ timeout: 3000 }).catch(() => null);
+      await page.waitForTimeout(500);
+      break;
+    }
+  }
+
   // 1) Upload resume.
   if (ctx.application.resume_pdf_path) {
     await uploadResume(page, ctx.application.resume_pdf_path);
+  }
+
+  // 1b) Upload cover letter PDF if a file input with "cover" in name/label exists.
+  const coverPath = resolveCoverLetterPath(ctx.application.id);
+  if (coverPath) {
+    const coverInput = page.locator(
+      'input[type="file"][name*="cover" i], input[type="file"][id*="cover" i]',
+    ).first();
+    if ((await coverInput.count()) > 0) {
+      try {
+        await coverInput.setInputFiles(coverPath, { timeout: 8000 });
+        qaLog.push({ question: "[cover letter file]", answer: path.basename(coverPath) });
+      } catch (err) {
+        // non-fatal; some forms have no separate cover-letter file slot
+      }
+    }
   }
 
   // 2) Walk form fields.
@@ -83,7 +174,17 @@ export async function fillGeneric(page: Page, ctx: FillContext): Promise<FillRes
     await pasteCoverLetter(page, ctx.application.cover_letter_md);
   }
 
-  // 4) Submit (or highlight, depending on autoSubmit).
+  // 4) Solve reCAPTCHA if the page has one (best-effort; failure is
+  // non-fatal so we can still try Submit on invisible / lax sites).
+  if (ctx.autoSubmit) {
+    try {
+      await handleRecaptchaIfPresent(page);
+    } catch (err) {
+      console.warn(`[generic] captcha handler failed (continuing): ${(err as Error).message}`);
+    }
+  }
+
+  // 5) Submit (or highlight, depending on autoSubmit).
   const outcome = await finishForm(page, ctx.application.id, {
     autoSubmit: !!ctx.autoSubmit,
   });

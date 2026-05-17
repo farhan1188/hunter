@@ -22,6 +22,7 @@ import path from "node:path";
 import { existsSync } from "node:fs";
 import type { FillContext, FillResult } from "./generic.js";
 import { uploadResume, finishForm } from "./shared.js";
+import { handleRecaptchaIfPresent } from "./captcha-handle.js";
 
 // Resolve the resume PDF to an absolute path. The DB stores just the filename
 // (e.g. "resume-<id>.pdf"); the actual file lives in the project's ./tmp/ dir.
@@ -626,7 +627,17 @@ export async function fillGreenhouse(page: Page, ctx: FillContext): Promise<Fill
     qaLog.push({ question: `EEO ${labelText}`, answer: chosenText });
   }
 
-  // 5) Submit (or highlight in non-autoSubmit mode).
+  // 5) Solve reCAPTCHA if the form has one, then Submit (or highlight in
+  // non-autoSubmit mode). Failure is non-fatal: if the solver isn't
+  // configured (no TWOCAPTCHA_API_KEY) or errors, we still try Submit —
+  // forms with invisible reCAPTCHA sometimes accept anyway.
+  if (ctx.autoSubmit) {
+    try {
+      await handleRecaptchaIfPresent(page);
+    } catch (err) {
+      console.warn(`[gh] captcha handler failed (continuing): ${(err as Error).message}`);
+    }
+  }
   const outcome = await finishForm(ctxFrame as unknown as Page, ctx.application.id, {
     autoSubmit: !!ctx.autoSubmit,
     postClickWaitMs: 6000,
