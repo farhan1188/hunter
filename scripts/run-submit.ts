@@ -69,7 +69,9 @@ async function spawnAgent(applicationId: string, autoSubmit: boolean): Promise<{
     const proc = spawn(cmd, ["run", "agent", "--", ...passThrough], {
       cwd: path.join(process.cwd(), "agent"),
       env: { ...process.env, APPLICATION_ID: applicationId, ...(autoSubmit ? { AUTO_SUBMIT: "1" } : {}) },
-      shell: false,
+      // On Windows, npm.cmd is a batch file — spawn requires shell:true to
+      // invoke it. Otherwise we get EINVAL.
+      shell: isWindows,
     });
     let stdout = "";
     let stderr = "";

@@ -107,7 +107,22 @@ export async function scoreJob(
     .trim()
     .replace(/^```(?:json)?\n?/, "")
     .replace(/\n?```$/, "");
-  const parsed = JSON.parse(cleaned) as {
+
+  // Slice to the first balanced {...} so trailing Haiku prose doesn't break parse.
+  const start = cleaned.indexOf("{");
+  if (start < 0) throw new Error(`scoreJob: no JSON in response: ${cleaned.slice(0, 200)}`);
+  let depth = 0;
+  let end = -1;
+  for (let i = start; i < cleaned.length; i++) {
+    if (cleaned[i] === "{") depth++;
+    else if (cleaned[i] === "}") {
+      depth--;
+      if (depth === 0) { end = i; break; }
+    }
+  }
+  if (end < 0) throw new Error(`scoreJob: unbalanced braces: ${cleaned.slice(0, 200)}`);
+  const json = cleaned.slice(start, end + 1);
+  const parsed = JSON.parse(json) as {
     value: number;
     reasoning: string;
     dimensions: {
