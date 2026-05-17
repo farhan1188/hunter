@@ -9,7 +9,9 @@ import { getDb } from "@/src/db/client";
 import { getProfile, getSettings } from "@/src/profile/store";
 import { selectBullets } from "@/src/core/tailor/bullet-selection";
 import { generateCoverLetter } from "@/src/core/tailor/cover-letter";
-import { runQualityGates } from "@/src/core/quality/gates";
+import { runQualityGates, allGatesPass } from "@/src/core/quality/gates";
+import { transition } from "@/src/core/applications/persist";
+import type { ApplicationChannel } from "@/src/core/applications/types";
 
 const TMP_DIR = path.resolve("./tmp");
 
@@ -18,8 +20,9 @@ async function main() {
   const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
 
   const force = process.argv.includes("--force");
+  const promote = process.argv.includes("--promote-passing-gates");
   const { rows } = await db.execute(
-    `SELECT a.id, a.job_id, j.title, j.company_name, j.description_md
+    `SELECT a.id, a.job_id, a.ats_vendor, j.title, j.company_name, j.description_md
      FROM applications a
      JOIN jobs j ON j.id = a.job_id
      WHERE a.state = 'quality_review'
@@ -72,7 +75,17 @@ async function main() {
       args: [cover, pdfExists ? pdfFilename : null, JSON.stringify(gates), id],
     });
 
-    console.log(`  [backfilled] ${title} @ ${company} (pdf=${pdfExists ? "yes" : "MISSING"}, gates=${gates.numerics}/${gates.claim_equiv}/${gates.verbatim_phrase})`);
+    let suffix = "";
+    if (promote && allGatesPass(gates)) {
+      const atsNative = new Set(["greenhouse", "lever", "ashby"]);
+      const atsVendor = (r.ats_vendor as string | null) ?? null;
+      const channel: ApplicationChannel =
+        atsVendor && atsNative.has(atsVendor) ? "ats_native" : "local_agent";
+      await transition(db, id, "ready", { channel });
+      suffix = ` → promoted to ready (${channel})`;
+    }
+
+    console.log(`  [backfilled] ${title} @ ${company} (pdf=${pdfExists ? "yes" : "MISSING"}, gates=${gates.numerics}/${gates.claim_equiv}/${gates.verbatim_phrase})${suffix}`);
   }
 
   console.log("Done.");
