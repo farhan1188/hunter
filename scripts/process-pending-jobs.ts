@@ -36,16 +36,31 @@ async function main() {
   const db = getDb();
   const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
 
-  const { rows } = await db.execute(`
-    SELECT j.id, j.source, j.external_id, j.url, j.apply_url, j.ats_vendor,
-           j.company_name, j.title, j.location_remote, j.location_raw,
-           j.description_md, j.posted_at, j.visa_category
-      FROM jobs j
-      LEFT JOIN scores s ON s.job_id = j.id
-     WHERE s.job_id IS NULL
-       AND j.archived = 0
-     ORDER BY j.fetched_at DESC
-  `);
+  // --source=X to restrict to one adapter (e.g. greenhouse — those have
+  // direct ATS apply URLs, unlike weworkremotely/jobicy/etc which all have
+  // gated listing URLs).
+  const sourceFilter = (() => {
+    for (const a of args) {
+      const m = a.match(/^--source=([\w-]+)$/);
+      if (m) return m[1];
+    }
+    return null;
+  })();
+
+  const { rows } = await db.execute({
+    sql: `
+      SELECT j.id, j.source, j.external_id, j.url, j.apply_url, j.ats_vendor,
+             j.company_name, j.title, j.location_remote, j.location_raw,
+             j.description_md, j.posted_at, j.visa_category
+        FROM jobs j
+        LEFT JOIN scores s ON s.job_id = j.id
+       WHERE s.job_id IS NULL
+         AND j.archived = 0
+         ${sourceFilter ? "AND j.source = ?" : ""}
+       ORDER BY j.fetched_at DESC
+    `,
+    args: sourceFilter ? [sourceFilter] : [],
+  });
   console.log(`Pending: ${rows.length} jobs need classify+score+qualify.`);
 
   let classified = 0;
