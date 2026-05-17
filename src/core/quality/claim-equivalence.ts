@@ -29,7 +29,12 @@ export async function judgeClaimEquivalence(input: {
     .trim()
     .replace(/^```(?:json)?\n?/, "")
     .replace(/\n?```$/, "");
-  return JSON.parse(text) as ClaimEquivResult;
+  // Haiku occasionally appends a sentence of commentary after the JSON. Slice to
+  // the first balanced top-level object so JSON.parse doesn't choke on the tail.
+  const start = text.indexOf("{");
+  const end = text.lastIndexOf("}");
+  const json = start >= 0 && end > start ? text.slice(start, end + 1) : text;
+  return JSON.parse(json) as ClaimEquivResult;
 }
 
 export async function judgeAllPairs(

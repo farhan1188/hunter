@@ -14,4 +14,15 @@ describe("checkNumerics", () => {
   it("treats years (4-digit numbers in date context) as allowed if user opts in", () => {
     expect(checkNumerics("Worked from 2020-2024", [])).toEqual({ pass: false, reason: expect.any(String) });
   });
+  it("normalizes suffixes so bullet '20+' matches allowed '20+'", () => {
+    expect(checkNumerics("Lead 20+ engineers", ["20+"])).toEqual({ pass: true });
+  });
+  it("normalizes both bullet and allow-list (e.g. percent, K/M)", () => {
+    expect(checkNumerics("Cut latency 99%", ["99%"])).toEqual({ pass: true });
+    expect(checkNumerics("Saved $1.5M annually", ["$1.5M"])).toEqual({ pass: true });
+  });
+  it("accepts digits that appear in extraContext (company/role text)", () => {
+    expect(checkNumerics("Joined Plaid", [], "Plaid 5 (Series E)")).toEqual({ pass: true });
+    expect(checkNumerics("Built for the 8 Tower team", [], "8 Tower Capital")).toEqual({ pass: true });
+  });
 });

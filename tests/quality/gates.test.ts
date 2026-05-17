@@ -32,4 +32,27 @@ describe("runQualityGates", () => {
     });
     expect(result.verbatim_phrase).toBe("fail");
   });
+  it("soft-passes verbatim_phrase when no company artifact (phrase is null)", async () => {
+    const result = await runQualityGates({
+      tailored_bullets: [],
+      cover_letter: "any cover letter",
+      verbatim_phrase: null,
+    });
+    expect(result.verbatim_phrase).toBe("pass");
+    expect(result.notes).toContain("skipped (no company artifact)");
+  });
+  it("accepts digits in company name / role title via extraContext", async () => {
+    const result = await runQualityGates({
+      tailored_bullets: [{
+        tailored: "Joined 8 Tower as a 2024 hire",
+        original: "Joined 8 Tower as a 2024 hire",
+        source_numbers: ["2024"],
+      }],
+      cover_letter: "x",
+      verbatim_phrase: null,
+      company_name: "8 Tower Capital",
+      role_title: "Senior PM",
+    });
+    expect(result.numerics).toBe("pass");
+  });
 });

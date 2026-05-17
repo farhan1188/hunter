@@ -79,7 +79,7 @@ export async function renderResumePdf(input: ResumeRenderInput): Promise<Buffer>
     await writeFile(mainPath, main, "utf8");
 
     await new Promise<void>((resolve, reject) => {
-      const proc = spawn("typst", ["compile", mainPath, outPath]);
+      const proc = spawn(process.env.TYPST_BIN || "typst", ["compile", mainPath, outPath]);
       let stderr = "";
       proc.stderr.on("data", (chunk) => { stderr += String(chunk); });
       proc.on("error", reject);

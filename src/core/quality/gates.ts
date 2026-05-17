@@ -6,6 +6,10 @@ export interface GatesInput {
   tailored_bullets: Array<{ tailored: string; original: string; source_numbers: string[] }>;
   cover_letter: string;
   verbatim_phrase: string | null;
+  // Digits appearing in these (company name + role title) are treated as
+  // factual context, not fabricated claims, so the numerics gate accepts them.
+  company_name?: string;
+  role_title?: string;
 }
 
 export async function runQualityGates(input: GatesInput): Promise<QualityGates> {
@@ -16,8 +20,10 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
   };
 
   // Numerics
+  const extraContext = [input.company_name ?? "", input.role_title ?? ""].join(" ");
   const num = checkNumericsForAll(
-    input.tailored_bullets.map((b) => ({ tailored: b.tailored, source_numbers: b.source_numbers }))
+    input.tailored_bullets.map((b) => ({ tailored: b.tailored, source_numbers: b.source_numbers })),
+    extraContext
   );
   result.numerics = num.pass ? "pass" : "fail";
   if (!num.pass) result.notes = `numerics: ${num.reason}`;
@@ -31,15 +37,18 @@ export async function runQualityGates(input: GatesInput): Promise<QualityGates> 
     result.notes = (result.notes ?? "") + ` | claim_equiv: ${ce.failure.divergence_note}`;
   }
 
-  // Verbatim phrase
+  // Verbatim phrase. If a phrase WAS fetched, enforce its presence (hard fail
+  // on mismatch — a fabricated phrase is worse than no phrase). If no artifact
+  // was fetchable, soft-pass with a note so the app can still proceed; the
+  // cover letter just won't include a verbatim reference.
   if (input.verbatim_phrase) {
     result.verbatim_phrase = input.cover_letter.includes(input.verbatim_phrase) ? "pass" : "fail";
     if (result.verbatim_phrase === "fail") {
       result.notes = (result.notes ?? "") + ` | verbatim_phrase: missing "${input.verbatim_phrase}"`;
     }
   } else {
-    result.verbatim_phrase = "fail";
-    result.notes = (result.notes ?? "") + ` | verbatim_phrase: no company artifact`;
+    result.verbatim_phrase = "pass";
+    result.notes = (result.notes ?? "") + ` | verbatim_phrase: skipped (no company artifact)`;
   }
 
   return result;
