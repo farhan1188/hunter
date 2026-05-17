@@ -40,16 +40,19 @@ export async function insertJobs(
     } else {
       await db.execute({
         sql: `INSERT INTO jobs (
-          id, source, external_id, url, company_name, company_domain, company_hq_country,
+          id, source, external_id, url, apply_url, ats_vendor,
+          company_name, company_domain, company_hq_country,
           title, location_remote, location_raw, location_geo,
           visa_category, visa_target_countries_json, target_timezone,
           description_md, posted_at, raw_ref, fetched_at, last_seen_at, status
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'open')`,
         args: [
           j.id,
           j.source,
           j.external_id,
           j.url,
+          j.apply_url ?? j.url, // fallback to the source URL if no separate apply page
+          j.ats_vendor ?? null,
           j.company.name,
           j.company.domain ?? null,
           j.company.hq_country ?? null,
