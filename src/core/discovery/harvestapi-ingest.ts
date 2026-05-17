@@ -53,8 +53,14 @@ export function harvestApiToJobPosting(item: HarvestApiItem): JobPosting {
       remote: item.workplaceType === "remote" || item.workRemoteAllowed === true,
       raw: item.location.linkedinText,
     },
+    // visa starts as 'unknown' regardless of LinkedIn-reported country: a job
+    // located in the US could be international-remote, sponsorship-offering, or
+    // strictly US-only — only the LLM classifier can tell. Defaulting to
+    // 'country_specific' here was the bug that caused 38 US-only jobs to queue
+    // for auto-submission from a Pakistan-based account. The visa fields are
+    // overwritten by classifyVisa() in the ingest routine before qualification.
     visa: {
-      category: countryCode ? "country_specific" : "unknown",
+      category: "unknown",
       target_countries: countryCode ? [countryCode] : [],
     },
     description_md: item.descriptionText,

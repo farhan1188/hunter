@@ -10,20 +10,51 @@ import type {
 import { assertValidTransition } from "./transitions";
 
 /**
+ * Visa categories the user is geographically eligible to apply for. Anything
+ * else (country_specific without sponsorship, unknown) is dropped at qualification
+ * time. User is in Pakistan — US/UK/etc-only roles are wasted applications and
+ * pollute the user's ATS profile.
+ */
+export const ELIGIBLE_VISA_CATEGORIES = [
+  "international_remote",
+  "sponsorship_offered",
+] as const;
+export type EligibleVisaCategory = (typeof ELIGIBLE_VISA_CATEGORIES)[number];
+
+export function isEligibleVisaCategory(value: string | null | undefined): value is EligibleVisaCategory {
+  if (!value) return false;
+  return (ELIGIBLE_VISA_CATEGORIES as readonly string[]).includes(value);
+}
+
+/**
  * Create a new application in `qualified` state for a job. Idempotent on job_id
  * thanks to the UNIQUE constraint — returns the existing row's id if one exists.
+ *
+ * Returns null if the job is NOT visa-eligible (country_specific or unknown);
+ * callers should treat that as "skip this job, don't tailor or submit." Already-
+ * existing applications are returned regardless of current visa eligibility
+ * (history wins; the purge script handles re-classifications).
  */
 export async function createQualified(
   db: Client,
   jobId: string,
   channel: ApplicationChannel | null,
   atsVendor: string | null
-): Promise<string> {
+): Promise<string | null> {
   const existing = await db.execute({
     sql: "SELECT id FROM applications WHERE job_id = ?",
     args: [jobId],
   });
   if (existing.rows.length > 0) return existing.rows[0].id as string;
+
+  const job = await db.execute({
+    sql: "SELECT visa_category FROM jobs WHERE id = ?",
+    args: [jobId],
+  });
+  if (job.rows.length === 0) throw new Error(`job not found: ${jobId}`);
+  if (!isEligibleVisaCategory(job.rows[0].visa_category as string | null)) {
+    return null;
+  }
 
   const id = randomUUID();
   await db.execute({

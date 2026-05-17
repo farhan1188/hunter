@@ -48,11 +48,19 @@ NEVER touched — Apify scrapes from its own infrastructure.
 
 5. INSERT OR IGNORE into `jobs` (UNIQUE on source+external_id is already there).
    For NEW jobs (not skipped by IGNORE):
-   - Classify visa via existing prompt
-   - Score via existing prompt (Haiku)
-   - If score >= settings.score_threshold AND visa not auto-zeroed:
-     create `applications` row with state='qualified', channel=NULL (decided later),
-     ats_vendor=jobs.ats_vendor.
+   - **Classify visa via the classifyVisa prompt FIRST.** The harvestapi-ingest
+     mapper defaults `visa_category='unknown'`; the classifier is the source of
+     truth. Persist the result with `UPDATE jobs SET visa_category=?, ...`.
+   - Score via the scoreJob prompt (Haiku).
+   - Qualify ONLY when BOTH of these hold:
+     - `score >= settings.score_threshold`, AND
+     - `visa_category IN ('international_remote', 'sponsorship_offered')`.
+     This is the Pakistan-eligibility gate — country_specific and unknown jobs
+     are visible in the UI feed but MUST NOT be auto-qualified. `createQualified()`
+     enforces the same gate and returns null on rejected jobs; treat null as
+     "skip, do not count as qualified."
+   - On qualify: create `applications` row with state='qualified',
+     channel=NULL (decided later), ats_vendor=jobs.ats_vendor.
 
 6. Update the `adapters` row with `name = 'linkedin'`:
    ```sql

@@ -13,6 +13,20 @@ Append-only chronological record of meaningful work. Newest at top. Format:
 
 ---
 
+## [2026-05-17] Pakistan-eligibility gate + search-radius expansion
+
+Investigation triggered by the user noticing that 2 of the 3 "successful" submissions (Airbnb + Axon) were US-only roles — applying to them from Pakistan is a waste at best and a profile-pollution risk at worst.
+
+- **Root cause:** `harvestApiToJobPosting` (src/core/discovery/harvestapi-ingest.ts:57) hard-coded `category='country_specific'` whenever LinkedIn returned a country code, never deferring to the LLM classifier. Combined with `scripts/uncap-and-qualify.ts` flipping everything ≥50 score to qualified regardless of visa, the pipeline happily queued 38 US-only roles for auto-submit.
+- **Cleanup:** `scripts/purge-non-pakistan-eligible.ts` archived 61 country_specific jobs and dismissed 44 in-flight applications (40 ready/quality_review + 4 submit_failed). The 2 already-submitted on Airbnb/Axon stay as terminal history.
+- **Code gate:** `createQualified()` in `src/core/applications/persist.ts` now reads `visa_category` from the parent job and returns `null` (skip) unless it's in `ELIGIBLE_VISA_CATEGORIES = ['international_remote', 'sponsorship_offered']`. Callers (`uncap-and-qualify.ts`, `run-harvestapi.ts`, `import-url.ts`) updated to handle null and count correctly. Routine spec at `routines/harvestapi.md` step 5 rewritten to make the gate explicit.
+- **Harvestapi mapper fixed:** defaults `visa.category='unknown'` so the LLM classifier always gets to make the real call.
+- **Search radius widened:** seeded 4 missing global-remote adapters (weworkremotely, himalayas, jobicy, workingnomads) into the `adapters` table (`scripts/seed-remote-adapters.ts`); they were already in the code registry but never enabled in DB. Bumped `run-harvestapi.ts` defaults from 3×3×5 (~45 jobs/run) to 5×5×8 (~200 jobs/run). Dropped Pakistan from LinkedIn search locations (returns local roles); added "Worldwide" first when `accept_international_remote=true`.
+- **Honest read on submission verification:** the `state='submitted'` in the DB is heuristic-only (`finishForm`'s URL+body-text check in `agent/src/form-fillers/shared.ts:160`). Audit screenshot save is silently catching errors; no on-disk artifacts exist. Gmail confirmation emails are the only reliable signal. Saved as feedback memory.
+- **Memories added:** `feedback_gmail_source_of_truth.md`, `feedback_pakistan_strict_targeting.md`.
+
+After: 12 active jobs (all `international_remote`), 7 ready, 1 submitted (Cove). 2 country_specific submissions preserved as history.
+
 ## [2026-05-17] Goal session — humanize cover letters, fix UI gaps, new resume
 
 - **New resume imported** from `Farhan_Ahmed_Khan_Resume.docx`. Added `mammoth` for .docx → text extraction, plus `extractResumeFromText` in `src/profile/extract.ts` (parallel to the existing PDF path) and two one-shot scripts (`scripts/import-resume-docx.ts`, `scripts/import-basics-docx.ts`). Basics now populated from the resume header (name, email, phone, location, LinkedIn).

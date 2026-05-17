@@ -33,9 +33,12 @@ const COUNTRY_NAMES: Record<string, string> = {
 
 function parseArgs(): { rows: number; titles: number; locations: number } {
   const args = process.argv.slice(2);
-  let rows = 5;
-  let titles = 3;
-  let locations = 3;
+  // Wider defaults than before: the user is hunting global-remote roles and
+  // needs depth. 5 × 5 × 8 = up to 200 jobs per run; classify+score at ~$0.0002
+  // each is ~$0.04/run, fine for a $3K/mo budget.
+  let rows = 8;
+  let titles = 5;
+  let locations = 5;
   for (const arg of args) {
     let m = arg.match(/^--rows=(\d+)$/);
     if (m) { rows = parseInt(m[1], 10); continue; }
@@ -55,20 +58,18 @@ async function main() {
   const db = getDb();
   const [profile, settings] = await Promise.all([getProfile(), getSettings()]);
 
-  // Build location list from union of work_auth + open_to_sponsorship countries,
-  // mapped to LinkedIn-recognized names. Capped by --locations.
-  // Sponsorship countries first — these are the markets the user actually targets.
-  // work_auth countries appended only for completeness.
-  const countryCodes = Array.from(
-    new Set([
-      ...(profile.preferences.open_to_sponsorship_countries ?? []),
-      ...profile.preferences.work_auth_countries,
-    ]),
-  );
-  const locations = countryCodes
+  // Build location list. Pakistan-eligibility means we ONLY want jobs that
+  // either offer relocation/sponsorship to a target country OR are explicitly
+  // global remote — searching "Pakistan" on LinkedIn returns local roles that
+  // are off-target. Strategy: sponsorship countries + "Worldwide" if the user
+  // accepts international remote.
+  const countryNames = (profile.preferences.open_to_sponsorship_countries ?? [])
     .map((code) => COUNTRY_NAMES[code.toLowerCase()])
-    .filter((name): name is string => name !== undefined)
-    .slice(0, locationCap);
+    .filter((name): name is string => name !== undefined);
+  const locationCandidates = profile.preferences.accept_international_remote
+    ? ["Worldwide", ...countryNames]
+    : countryNames;
+  const locations = locationCandidates.slice(0, locationCap);
 
   const jobTitles = profile.preferences.target_roles.slice(0, titleCap);
 
@@ -151,11 +152,13 @@ async function main() {
       await saveScore(db, score);
       scored++;
 
-      // Qualify if above threshold
+      // Qualify if above threshold — createQualified returns null if the job
+      // is not visa-eligible (country_specific or unknown), so only count the
+      // ones that actually landed.
       if (score.value >= settings.score_threshold) {
         const atsVendor = normalizeAts(posting.ats_vendor ?? null);
-        await createQualified(db, posting.id, null, atsVendor);
-        qualified++;
+        const appId = await createQualified(db, posting.id, null, atsVendor);
+        if (appId) qualified++;
       }
     } catch (err) {
       console.error(`Score failed for ${posting.id}:`, err);
