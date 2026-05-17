@@ -64,6 +64,7 @@ const NullishString = z
   .transform((v) => v ?? undefined);
 
 export const ResumeStructSchema = z.object({
+  summary: z.string().default(""),
   experience: z.array(
     z.object({
       company: z.string(),

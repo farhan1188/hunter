@@ -1,20 +1,19 @@
 import "dotenv/config";
-import { getDb } from "@/src/db/client";
+import { getProfile } from "@/src/profile/store";
 
 async function main() {
-  const db = getDb();
-  const { rows } = await db.execute(
-    `SELECT a.id, a.state, a.cover_letter_md, j.title, j.company_name
-     FROM applications a JOIN jobs j ON j.id = a.job_id
-     WHERE a.state = 'ready' AND a.updated_at > datetime('now','-30 minutes')
-     ORDER BY a.updated_at DESC`,
-  );
-  for (const r of rows) {
-    console.log(`\n=== ${r.title} @ ${r.company_name} ===`);
-    console.log(`id: ${r.id}`);
-    console.log(`---`);
-    console.log(r.cover_letter_md);
-    console.log(`---`);
+  const p = await getProfile();
+  if (!p.resume_struct) { console.log("no resume_struct"); return; }
+  console.log("summary:", JSON.stringify((p.resume_struct as any).summary ?? ""));
+  console.log();
+  console.log("experiences:");
+  for (const e of p.resume_struct.experience) {
+    console.log(`  ${e.company} | ${e.title} | ${e.start} → ${e.end ?? "present"} (${e.bullets.length} bullets)`);
+  }
+  console.log();
+  console.log("projects:");
+  for (const pr of p.resume_struct.projects) {
+    console.log(`  ${pr.name} (${pr.bullets.length} bullets)`);
   }
 }
 main().catch((e) => { console.error(e); process.exit(1); });

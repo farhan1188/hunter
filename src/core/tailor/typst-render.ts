@@ -16,27 +16,35 @@ export interface ResumeRenderInput {
 
 /**
  * Render the resume to PDF using the Typst CLI. Returns a Buffer of the PDF bytes.
- * Requires `typst` on PATH (install via https://typst.app/docs/quickstart/ or
- * `winget install Typst.Typst` on Windows; `apt install typst` on Linux routines —
- * verify availability in the routine environment as part of setup).
+ * Requires `typst` on PATH or TYPST_BIN env var pointing at the binary.
+ *
+ * Renders the COMPLETE resume — every experience, every project, the summary —
+ * not just the JD-matched bullets. Tailoring re-orders bullets within each role
+ * so the most JD-relevant ones appear first, but no role or project gets dropped
+ * (chronological story matters; current roles with sparse bullets must still show).
  */
 export async function renderResumePdf(input: ResumeRenderInput): Promise<Buffer> {
-  // Group selected bullets back into experiences for the template
-  const byExp = new Map<string, RankedBullet[]>();
-  for (const b of input.selected_bullets) {
-    const key = `${b.source_company}|${b.source_title}`;
-    if (!byExp.has(key)) byExp.set(key, []);
-    byExp.get(key)!.push(b);
-  }
-  const experiences = input.resume.experience
-    .filter((e) => byExp.has(`${e.company}|${e.title}`))
-    .map((e) => ({
+  // Index the selected bullets by their text so we can prioritize them within
+  // each experience without losing the others.
+  const selectedTexts = new Set(input.selected_bullets.map((b) => b.text));
+
+  const experiences = input.resume.experience.map((e) => {
+    // Stable partition: JD-matched bullets first, others after, original order within each.
+    const matched = e.bullets.filter((b) => selectedTexts.has(b.text));
+    const rest = e.bullets.filter((b) => !selectedTexts.has(b.text));
+    return {
       company: e.company,
       title: e.title,
       start: e.start,
       end: e.end ?? "present",
-      bullets: byExp.get(`${e.company}|${e.title}`)!.map((b) => b.text),
-    }));
+      bullets: [...matched, ...rest].map((b) => b.text),
+    };
+  });
+
+  const projects = input.resume.projects.map((p) => ({
+    name: p.name,
+    bullets: p.bullets.map((b) => b.text),
+  }));
 
   const inputJson = {
     name: input.basics.name ?? "",
@@ -44,9 +52,9 @@ export async function renderResumePdf(input: ResumeRenderInput): Promise<Buffer>
     phone: input.basics.phone ?? "",
     location: input.basics.location ?? "",
     links: input.basics.links ?? [],
-    summary: "",
+    summary: input.resume.summary ?? "",
     experiences,
-    projects: [],
+    projects,
     skills: input.resume.skills,
     education: input.resume.education,
   };

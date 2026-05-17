@@ -78,6 +78,7 @@ export interface ResumeEducation {
 }
 
 export interface ResumeStruct {
+  summary: string;
   experience: ResumeExperience[];
   projects: ResumeProject[];
   skills: { primary: string[]; secondary: string[] };
