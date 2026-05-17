@@ -53,9 +53,9 @@ The downstream claim-equivalence gate relies on the original bullet text being a
 - Builds a data JSON from `basics`, `selected_bullets` grouped back into experiences, `skills`, `education`.
 - Creates a temp dir, writes `data.json` + `main.typ` (template file inline + `#resume(...)` call).
 - Template lives at `src/core/tailor/templates/resume.typ`.
-- Shells to the `typst` CLI: `spawn("typst", ["compile", mainPath, outPath])`.
+- Shells to the `typst` CLI: `spawn(process.env.TYPST_BIN || "typst", ["compile", mainPath, outPath])`.
 - Reads the output PDF into a `Buffer` and cleans up the temp dir.
-- **Requires `typst` on PATH.** Install: `winget install Typst.Typst` (Windows) or `apt install typst` (Linux). If the binary is absent the routine logs a fatal error to `routine_runs`; see [gotchas](../gotchas.md).
+- **Requires `typst` on PATH, or `TYPST_BIN` env var pointing at the binary.** Install: `winget install Typst.Typst` (Windows) or `apt install typst` (Linux). On Windows winget often does not add a PATH shim — set `TYPST_BIN` in `.env` to the absolute exe path (see [gotchas](../gotchas.md)).
 
 The cloud routine uploads the PDF bytes to Google Drive and writes the Drive file ID back to `applications.resume_pdf_path`. The local-runner script writes the PDF to a local path.
 

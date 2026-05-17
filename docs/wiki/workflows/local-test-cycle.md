@@ -44,11 +44,16 @@ Cloud routines run on a cron schedule and are hard to observe. Runner scripts le
 
 1. Pull a small batch of LinkedIn jobs via Apify and ingest into Turso:
    ```
-   npm run ingest:linkedin -- --rows=5
+   npm run ingest:linkedin -- --rows=5 --titles=3 --locations=3
    ```
-   Expected output: lines like `fetched 5 items`, `inserted 5 jobs`, `qualified 3`.
-   If you see `qualified 0`, your score threshold is too high or preferences are
-   too narrow. Check `settings.score_threshold` in Turso (default 60).
+   `--rows` = `maxItems` (jobs per title × location pair). `--titles` and
+   `--locations` cap how many of your `target_roles` × country list are fed to the
+   actor. Defaults: rows=5, titles=3, locations=3 (up to 45 jobs ≈ $0.45). Start
+   smaller (`--rows=3 --titles=1 --locations=1`) when validating shape changes.
+   Expected output: `Apify input: N title(s) × M location(s)`, then
+   `Fetched K jobs / Inserted K new / Qualified Q`. If `Qualified 0` is unexpected,
+   either your `score_threshold` is too high (default 60; user's profile is 75)
+   or the keyword filter wasn't applied (silent failure mode — see [gotchas](../gotchas.md)).
 
 2. Open http://localhost:3000/feed (start `npm run dev` first). You should see the
    new jobs. Check the visa tags and score values for sanity.

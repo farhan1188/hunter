@@ -13,6 +13,18 @@ Append-only chronological record of meaningful work. Newest at top. Format:
 
 ---
 
+## [2026-05-16] First live ingest+tailor cycle — fixed Apify input shape, Typst PATH, JSON parse
+
+- **Apify token added** to root `.env` and verified via 5-row ingest.
+- **Fixed HarvestAPI input shape** in `scripts/run-harvestapi.ts`. The script was sending `searchQueries`/`locationNames`/`publishedAt` (none in the actor's schema), so Apify ignored the keyword filter and returned random global jobs (Receiving Manager, Attorney, Spanish logistics coordinator). Real schema is `jobTitles[]`, `locations[]`, `maxItems` (per title×location pair). Also: `pk` was missing from `COUNTRY_NAMES` so `work_auth=['pk']` collapsed to "United States" only; and `open_to_sponsorship_countries` (the actual targets) was ignored — fixed by unioning sponsorship-first.
+- **Added `--titles` and `--locations` CLI flags** to `run-harvestapi.ts` to control cost (defaults: 3 titles × 3 locations × maxItems=5).
+- **Second ingest (2 titles × 2 locations × 3 rows)** returned 9 on-topic senior PM jobs. 2 qualified above threshold 75: Zillow Senior PM Data Platform (92), Gogo AI PM (82).
+- **Fixed `spawn typst ENOENT`** by introducing `TYPST_BIN` env override in `src/core/tailor/typst-render.ts:82`. Winget installs typst at `…\WinGet\Packages\Typst.Typst_…\typst-x86_64-pc-windows-msvc\typst.exe` and doesn't always shim it onto PATH. Pointing `TYPST_BIN` at that absolute path works; added to `.env` and gotchas.
+- **Hardened claim-equivalence JSON parser** at `src/core/quality/claim-equivalence.ts:32` — Haiku occasionally appended a sentence of commentary after the JSON. Now slices to the first balanced `{...}` before parsing.
+- **End-to-end tailor cycle succeeded** for both qualified apps. Both routed to `quality_review` (not `ready`) due to (a) numerics gate firing on digit runs not in source `numbers[]`, (b) verbatim_phrase missing because no company artifacts are seeded. Resume PDFs rendered to `./tmp/resume-{app_id}.pdf` (~29KB each).
+- **Quality gate calibration** is the next decision point — both gate failures are expected behavior, not bugs, but may be too strict for v1.
+- **`agent/.env` is fully populated** (no longer placeholders); current-state.md updated.
+
 ## [2026-05-16] Karpathy-style wiki built; live-test scripts added; Run-Agent button shipped
 
 - **Added wiki layer** at `docs/wiki/` following Karpathy's LLM Wiki pattern. Created `CLAUDE.md` at repo root as the schema. Populated index, log (this file), current-state, overview, architecture, data-model, decisions, gotchas, file-map, glossary, components/*, workflows/*.

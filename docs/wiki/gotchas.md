@@ -6,6 +6,42 @@ Related: [conventions](conventions.md) | [architecture](architecture.md) | [deci
 
 ---
 
+## Apify HarvestAPI returns wildly off-topic jobs
+
+**You'll see:** `npm run ingest:linkedin` succeeds, but the dataset contains random unrelated roles (Receiving Manager, Attorney, Spanish logistics coordinator) with very low scores. No HTTP error, no warning.
+
+**Cause:** The actor's input schema uses `jobTitles[]` and `locations[]` — not `searchQueries`, `locationNames`, `publishedAt`, `contractType`, `workType`, `experienceLevel`. If you pass unknown fields, Apify silently ignores them, runs the actor with **no filter**, and returns whatever's newest globally. Strict array-vs-string mismatch on a recognized field IS rejected (e.g. `experienceLevel: ""` errors with "must be array"), but unknown fields are tolerated. The routine prompt at `routines/harvestapi.md` had the right shape; the script at `scripts/run-harvestapi.ts` diverged.
+
+**Fix:** Match the schema exactly: `{ jobTitles: string[], locations: string[], maxItems: number, sortBy: "date" }`. See `scripts/run-harvestapi.ts` for the working version. Real schema: https://apify.com/harvestapi/linkedin-job-search/input-schema.
+
+**Why it's tricky:** Silent failure mode — looks like the system is "working" because jobs are arriving. Only the scorer revealed they were garbage. Also: `maxItems` is **per (title × location) pair**, not per-run, so 9 titles × 9 locations × 25 = 2,025 jobs. Easy to blow the Apify budget. The local script caps titles/locations via CLI flags (`--titles=N --locations=N`) to control this.
+
+---
+
+## `spawn typst ENOENT` on Windows even after `winget install Typst.Typst`
+
+**You'll see:** `npm run tailor` errors with `Error: spawn typst ENOENT` in `src/core/tailor/typst-render.ts`. Yet `typst --version` works in a fresh shell.
+
+**Cause:** Winget installs typst at `%LOCALAPPDATA%\Microsoft\WinGet\Packages\Typst.Typst_…\typst-x86_64-pc-windows-msvc\typst.exe` but doesn't always create a shim in `%LOCALAPPDATA%\Microsoft\WindowsApps\`. Git Bash inherits PATH at shell-start; even if winget eventually shims it, an already-open shell won't see it.
+
+**Fix:** Set `TYPST_BIN` in root `.env` to the absolute path of `typst.exe`. The renderer at `src/core/tailor/typst-render.ts:82` reads `process.env.TYPST_BIN || "typst"`. Cloud routines on Linux can leave `TYPST_BIN` unset and install via `apt install typst`.
+
+**Why it's tricky:** Different shells see different PATHs depending on when they were started. The wiki said Typst was "verified working" — and it was, in the shell where the smoke test ran. Different session, same machine, ENOENT.
+
+---
+
+## Haiku occasionally appends prose after JSON-only output
+
+**You'll see:** `SyntaxError: Unexpected non-whitespace character after JSON at position N` thrown from `JSON.parse` in a quality-gate or scoring path. The system prompt explicitly says "Output JSON only" — but Haiku sometimes returns `{...}\n\nThis bullet adds claim X not in the original.`
+
+**Cause:** Even with a strict "JSON only" instruction and `max_tokens` headroom, Haiku occasionally wraps the JSON in commentary. The `claim-equivalence.ts` parser only stripped fenced code blocks (` ```json … ``` `), not trailing prose.
+
+**Fix:** Slice to the first balanced top-level object before parsing: `text.slice(text.indexOf("{"), text.lastIndexOf("}") + 1)`. Safe for shallow schemas (no risk of strings containing unescaped braces). The fix is in `src/core/quality/claim-equivalence.ts:33`. Long-term: switch to tool_use (forced JSON via schema). See [open-questions.md](open-questions.md).
+
+**Why it's tricky:** Intermittent. Most calls return clean JSON; the failing one looks like a network/model issue at first. Only happens for ambiguous comparisons where the model "wants" to explain.
+
+---
+
 ## libSQL `SELECT *` returns wrong column values
 
 **You'll see:** A column you expect to be a string (e.g. `ats_vendor`) silently contains the value from a different column (e.g. `title`). No error is thrown.

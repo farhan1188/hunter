@@ -1,6 +1,6 @@
 # Current state
 
-**Last updated:** 2026-05-16
+**Last updated:** 2026-05-16 (post first live ingest+tailor cycle)
 
 The "where are we right now" page. Updated whenever status changes. Read this before any work.
 
@@ -12,7 +12,8 @@ The "where are we right now" page. Updated whenever status changes. Read this be
 - **9 direct adapters** in code: RemoteOK, Honeypot, Greenhouse, Lever, Ashby, Himalayas, Jobicy, WorkingNomads, WeWorkRemotely. Whether they're currently *running* depends on whether the existing `ingest` cloud routine (from Phase 1) is still scheduled — unconfirmed in this session.
 - **GitHub remote** at https://github.com/farhan1188/hunter. Default branch `main`. All session work pushed.
 - **Job Hunter Chrome** running locally with CDP on port 9222, dedicated profile at `C:\Users\user\chrome-cdp-profile`, LinkedIn signed in. Stays open while user uses the Local Agent.
-- **Typst CLI** installed locally (v0.14.2). PDF rendering works end-to-end.
+- **Typst CLI** installed locally (v0.14.2) at `…\WinGet\Packages\Typst.Typst_…\typst-x86_64-pc-windows-msvc\typst.exe`. Not on PATH; `TYPST_BIN` env var (root `.env`) points the renderer at it. PDF rendering works end-to-end (~29KB per resume).
+- **First live ingest+tailor cycle** done (2026-05-16). 9 jobs ingested via Apify; 2 qualified at scores 92 (Zillow Senior PM Data Platform) and 82 (Gogo AI PM); both rendered to PDF; both routed to `quality_review` due to strict gate calibration (see Open questions).
 
 ## Code-complete, not yet deployed (needs user action)
 
@@ -33,8 +34,7 @@ These are written and tested but won't *do* anything until deployed:
 
 ## Blocked
 
-- **First end-to-end live test** blocked on `APIFY_API_TOKEN` not being in root `.env`. User said they added it but `grep -c '^APIFY_API_TOKEN=' .env` returned 0. Need to verify token is present before `npm run ingest:linkedin` can succeed.
-- **`agent/.env` Turso fields** are placeholders. User needs to copy `TURSO_DATABASE_URL` from root `.env` and either copy `TURSO_AUTH_TOKEN_FULL` as `TURSO_AUTH_TOKEN_AGENT` or generate a scoped token. Until then, agent can't read the DB.
+- Nothing currently blocked. `APIFY_API_TOKEN` is now in `.env`; `agent/.env` is fully populated (`TURSO_DATABASE_URL`, `TURSO_AUTH_TOKEN_AGENT`, `CHROME_CDP_URL`). Decision needed on quality-gate calibration before next ingest.
 
 ## Deferred (intentional)
 
@@ -56,11 +56,9 @@ See [open-questions.md](open-questions.md). Highlights:
 
 Right now, in priority order:
 
-1. Confirm `APIFY_API_TOKEN` is in root `.env`. If missing, paste it.
-2. Fill `TURSO_DATABASE_URL` + `TURSO_AUTH_TOKEN_AGENT` in `agent/.env`.
-3. Run `npm run ingest:linkedin -- --rows=5` (Claude can do this once env is set).
-4. Run `npm run tailor`.
-5. Open `/pipeline`, eyeball whatever ended up in Ready / Needs review.
-6. Click into 2-3 cards in `/pipeline/[id]`, read the cover letters.
-7. If quality is acceptable, proceed to deploying the 3 routines via `/schedule`.
-8. Otherwise, course-correct prompts and re-run locally first.
+1. Open `http://localhost:3000/pipeline` (dev server should be running). Look at the two `quality_review` cards (Zillow Senior PM Data Platform, Gogo AI PM). Open `tmp/resume-*.pdf` to eyeball the rendered resumes; read the cover letters in the detail page.
+2. Decide on quality-gate calibration:
+   - Should the numerics gate flag every digit run not in source `numbers[]`, or should it allow company/role names containing digits?
+   - Should verbatim_phrase be a soft warning instead of a hard fail when no company artifact is fetchable?
+3. After gate decision: run `npm run ingest:linkedin -- --rows=5 --titles=3 --locations=3` for a bigger sample (~$0.45).
+4. After 5-10 manual reviews look good: deploy the 3 routines via `/schedule` on claude.ai per [workflows/deploy-routines.md](workflows/deploy-routines.md). Keep `submission_paused = ON` initially.
