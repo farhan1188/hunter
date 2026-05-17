@@ -4,6 +4,8 @@ import { connectToChrome } from "./chrome.js";
 import { fillGeneric, type FillContext, type FillResult } from "./form-fillers/generic.js";
 import { fillLinkedInEasyApply } from "./form-fillers/linkedin-easyapply.js";
 import { fillWorkday } from "./form-fillers/workday.js";
+import { fillGreenhouse } from "./form-fillers/greenhouse.js";
+import { fillLever } from "./form-fillers/lever.js";
 import { matchesDenyList } from "@hub/core/qa/deny-list";
 import { listKb, findAnswer } from "@hub/core/qa/kb";
 
@@ -53,7 +55,13 @@ export async function runOneApplication(opts: RunnerOptions): Promise<RunnerResu
   await page.goto(app.apply_url, { waitUntil: "domcontentloaded" });
 
   let result: FillResult;
-  if (/linkedin\.com\/jobs/.test(app.apply_url)) {
+  // Greenhouse: native greenhouse.io URLs, OR any URL with a gh_jid query param
+  // (companies that embed the Greenhouse form on their own domain).
+  if (/greenhouse\.io|[?&]gh_jid=/.test(app.apply_url)) {
+    result = await fillGreenhouse(page, ctx);
+  } else if (/jobs\.lever\.co/.test(app.apply_url)) {
+    result = await fillLever(page, ctx);
+  } else if (/linkedin\.com\/jobs/.test(app.apply_url)) {
     result = await fillLinkedInEasyApply(page, ctx);
   } else if (/myworkdayjobs\.com/.test(app.apply_url)) {
     result = await fillWorkday(page, ctx);
