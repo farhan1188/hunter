@@ -168,4 +168,21 @@ The endpoint streams progress as NDJSON if you want to watch.
 
 ---
 
+## Platform reality (from a real live test, 3 submissions, May-17)
+
+| Platform | Result | What we learned |
+|---|---|---|
+| **Custom careers (Cove)** | **SUBMITTED end-to-end**, no human touch | Simple HTML forms with standard `<label for="...">` markup work well with the generic filler. State machine moved to `submitted`, `submitted_at` recorded. |
+| **Lever (System1)** | Failed — "couldn't verify success after submit" | Lever uses typeahead fields ("Current location", "Current company") that don't accept raw text. The agent typed values but Lever's form-validation rejected. Needs a Lever-specific filler that picks from the autocomplete dropdown. |
+| **Custom careers (Electronic Arts)** | Failed — "no Submit button found" | jobs.ea.com has a multi-step flow with an interstitial "Sign in / Create account" page before the form, so the agent landed on a page with no Submit button. Workday-style fix needed. |
+
+**Realistic expectations today:**
+- **Greenhouse / Ashby / standard custom forms** likely work like Cove did
+- **Lever's typeahead-heavy forms** need an enhanced filler (open issue)
+- **Workday / EA / SAP SuccessFactors** need site-specific handlers (open issue)
+- **Set `daily_cap` to something like 5** while you watch the success rate per round
+- **Always check the audit screenshots** at `%TEMP%/job-hunter-submit-shots/` after the first few rounds — they're saved on every Submit attempt, success or fail
+
+---
+
 ## Done. Go run a round.

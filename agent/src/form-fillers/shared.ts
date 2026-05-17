@@ -7,11 +7,16 @@ import type { Page, Locator } from "playwright-core";
 const ALIASES: Record<string, string[]> = {
   "first_name": ["first name", "firstname", "given name"],
   "last_name":  ["last name", "lastname", "family name", "surname"],
-  "email":      ["email", "email address", "e-mail"],
-  "phone":      ["phone", "phone number", "mobile", "tel"],
-  "linkedin":   ["linkedin", "linkedin profile", "linkedin url"],
+  "full_name":  ["full name", "your name", "name", "candidate name", "applicant name", "legal name"],
+  "email":      ["email", "email address", "e-mail", "your email"],
+  "phone":      ["phone", "phone number", "mobile", "tel", "telephone", "contact number"],
+  "location":   ["location", "city", "current location", "your location", "where are you based", "based in"],
+  "linkedin":   ["linkedin", "linkedin profile", "linkedin url", "linkedin link"],
   "github":     ["github", "github profile", "github url"],
-  "portfolio":  ["portfolio", "website", "personal site"],
+  "portfolio":  ["portfolio", "website", "personal site", "personal website"],
+  "current_company": ["current company", "current employer", "company", "employer"],
+  "current_title":   ["current title", "current role", "job title", "title", "role"],
+  "years_experience": ["years of experience", "years experience", "experience in years"],
 };
 
 function norm(s: string): string {
@@ -20,10 +25,22 @@ function norm(s: string): string {
 
 export function matchLabelToField(label: string, candidates: string[]): string | null {
   const n = norm(label);
+  // Exact first.
   for (const c of candidates) {
     if (n === norm(c)) return c;
     const aliases = ALIASES[c] ?? [];
     for (const a of aliases) if (n === norm(a)) return c;
+  }
+  // Prefix fallback — many label containers leak typeahead / helper text
+  // after the actual label (e.g. Lever's "Current location ✱No location
+  // found. Try entering a different locationLoading"). Match on a strong
+  // prefix that aligns to a word boundary.
+  for (const c of candidates) {
+    const checks = [c, ...(ALIASES[c] ?? [])];
+    for (const candidate of checks) {
+      const nc = norm(candidate);
+      if (nc.length >= 4 && n.startsWith(nc + " ")) return c;
+    }
   }
   return null;
 }
