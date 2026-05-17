@@ -119,7 +119,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
         {application.state === "quality_review" && (
           <>
             <button
-              className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-white bg-ink-hover disabled:opacity-50"
               disabled={busy}
               onClick={() => act(`/api/applications/${application.id}/review`, { action: "accept" })}
               title="Mark this approved and queue it to send, even though some quality checks didn't pass."
@@ -139,7 +139,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
         {application.state === "ready" && application.channel === "local_agent" && (
           <>
             <button
-              className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+              className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-white bg-ink-hover disabled:opacity-50"
               disabled={busy}
               onClick={sendInChrome}
               title="Opens this job in your Job Hunter Chrome window, fills the application form, and stops before clicking Submit so you can review."
@@ -350,7 +350,7 @@ export function DetailTabs({ application }: { application: ApplicationDetail }) 
                 Draft a short LinkedIn DM to a hiring manager or someone at the company. Always reviewed by you before sending.
               </p>
               <button
-                className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+                className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-white bg-ink-hover disabled:opacity-50"
                 disabled={outreachBusy}
                 onClick={generateOutreach}
               >

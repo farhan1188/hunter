@@ -91,11 +91,11 @@ export default async function PipelinePage() {
               </h2>
               <p className="mb-3 text-xs text-gray-500">{col.hint}</p>
               {items.length === 0 ? (
-                <p className="rounded border border-dashed p-2 text-xs text-gray-400">
+                <p className="rounded border border-dashed p-2 text-xs leading-relaxed text-gray-600">
                   {col.emptyHint}
                 </p>
               ) : (
-                <ul className="space-y-2">
+                <ul className="-mx-1 divide-y divide-gray-100">
                   {items.map((r) => {
                     const locTag = r.location_remote
                       ? "Remote"
@@ -103,7 +103,7 @@ export default async function PipelinePage() {
                     return (
                       <li key={r.id}>
                         <Link href={`/pipeline/${r.id}`}>
-                          <article className="rounded-md border p-3 transition-colors hover:border-gray-400 hover:bg-gray-50">
+                          <article className="rounded-md px-1 py-2.5 transition-colors hover:bg-gray-50">
                             <div className="flex items-start justify-between gap-2">
                               <span className="line-clamp-2 text-sm font-medium leading-snug">
                                 {r.title}

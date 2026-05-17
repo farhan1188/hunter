@@ -68,13 +68,13 @@ export function RunRoundButton({ autoSubmit }: { autoSubmit: boolean }) {
     <div className="space-y-2">
       <div className="flex items-center gap-3">
         <button
-          className="rounded bg-gray-900 px-4 py-2 text-sm font-semibold text-white hover:bg-gray-700 disabled:opacity-50"
+          className="rounded bg-ink px-4 py-2 text-sm font-semibold text-white bg-ink-hover disabled:opacity-50"
           disabled={busy}
           onClick={run}
         >
           {busy ? "Running…" : "Run autonomous round"}
         </button>
-        <div className="text-xs text-gray-500">
+        <div className="max-w-prose text-xs leading-relaxed text-gray-600">
           Pulls jobs → tailors → {autoSubmit ? <strong className="text-red-700">submits</strong> : <span>fills forms (Submit by you)</span>}.
           {!autoSubmit && (
             <>

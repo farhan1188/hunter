@@ -2,28 +2,35 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Project tokens. Tinted-dark "ink" replaces pure black per Impeccable
+   anti-pattern guidance (pure-black-white). Slight cool tilt to feel modern
+   without being theme-y. */
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
+    --foreground: 222 12% 13%;       /* was 240 10% 3.9% — near-black, slight blue */
     --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
+    --card-foreground: 222 12% 13%;
     --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
+    --popover-foreground: 222 12% 13%;
+    --primary: 222 14% 16%;          /* tinted dark for buttons (was 240 5.9% 10%) */
     --primary-foreground: 0 0% 98%;
     --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
+    --secondary-foreground: 222 14% 16%;
     --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
+    --muted-foreground: 222 8% 42%;  /* WCAG-compliant on white */
     --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
+    --accent-foreground: 222 14% 16%;
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 0 0% 98%;
     --border: 240 5.9% 90%;
     --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --ring: 222 14% 16%;
     --radius: 0.5rem;
+    /* "Ink" — the project's near-black for emphasis backgrounds. Replaces
+       Tailwind's bg-gray-900 / bg-black usages that triggered pure-black. */
+    --ink: 222 14% 16%;
+    --ink-hover: 222 14% 26%;
   }
 }
 
@@ -32,5 +39,15 @@
     background-color: hsl(var(--background));
     color: hsl(var(--foreground));
     font-feature-settings: "rlig" 1, "calt" 1;
+    line-height: 1.55; /* anti-pattern fix: tight-leading (was browser default) */
   }
+  /* Body-ish text elements get comfortable leading by default. */
+  p, li {
+    line-height: 1.6;
+  }
+}
+
+@layer utilities {
+  .bg-ink { background-color: hsl(var(--ink)); }
+  .bg-ink-hover:hover { background-color: hsl(var(--ink-hover)); }
 }

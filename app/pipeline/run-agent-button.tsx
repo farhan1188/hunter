@@ -27,7 +27,7 @@ export function RunAgentButton() {
   return (
     <div className="flex flex-col items-end gap-1">
       <button
-        className="rounded bg-gray-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+        className="rounded bg-ink px-3 py-1.5 text-sm font-medium text-white bg-ink-hover disabled:opacity-50"
         disabled={busy}
         onClick={run}
         title="Picks one Ready app, opens it in your Job Hunter Chrome window, and fills the form. Stops before Submit so you can review."

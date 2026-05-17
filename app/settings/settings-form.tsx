@@ -51,17 +51,17 @@ export function SettingsForm({ initial }: { initial: AppSettings }) {
           checked={s.autonomous_auto_submit}
           onCheckedChange={(v) => setS({ ...s, autonomous_auto_submit: v })}
         />
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           <Label className={s.autonomous_auto_submit ? "font-semibold text-amber-900" : "font-semibold"}>
             Apply automatically when I click &quot;Run autonomous round&quot;
           </Label>
-          <p className="text-xs text-gray-600">
+          <p className="max-w-prose text-xs leading-relaxed text-gray-600">
             When ON, the round button fills the form AND clicks Submit in your Chrome window.
             When OFF, it stops before Submit so you review and click yourself.
             Daily / weekly caps still apply. The Pause switch above wins regardless.
           </p>
           {s.autonomous_auto_submit && (
-            <p className="text-xs font-medium text-amber-900">
+            <p className="max-w-prose text-xs font-medium leading-relaxed text-amber-900">
               Heads up: applications go out without you seeing each one first.
               Recommended only after you&apos;ve watched a few rounds and trust the output.
             </p>

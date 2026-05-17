@@ -47,7 +47,7 @@ export default async function DashboardPage() {
       <section className="rounded-lg border bg-white p-4">
         <RunRoundButton autoSubmit={autoSubmit} />
         {paused && (
-          <p className="mt-3 rounded border border-red-200 bg-red-50 p-2 text-xs text-red-800">
+          <p className="mt-3 max-w-prose rounded border border-red-200 bg-red-50 p-2 text-xs leading-relaxed text-red-800">
             <strong>Sending is paused.</strong> The button will run discovery and tailoring but won&apos;t send anything until you unpause in Settings.
           </p>
         )}
@@ -89,9 +89,11 @@ export default async function DashboardPage() {
               </div>
             </section>
           ) : (
-            <section className="rounded-lg border border-dashed bg-white p-4 text-sm text-gray-600">
-              No applications waiting on you. New jobs flow in via the daily ingest;
-              run <code className="rounded bg-gray-100 px-1.5 py-0.5">npm run ingest:linkedin</code> to pull a fresh batch now.
+            <section className="rounded-lg border border-dashed bg-white p-4 text-sm leading-relaxed text-gray-600">
+              <p className="max-w-prose">
+                No applications waiting on you. New jobs flow in via the daily ingest;
+                run <code className="rounded bg-gray-100 px-1.5 py-0.5">npm run ingest:linkedin</code> to pull a fresh batch now.
+              </p>
             </section>
           )}
 

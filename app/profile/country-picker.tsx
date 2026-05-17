@@ -71,7 +71,7 @@ export function CountryPicker({
             className={
               "rounded-full px-3 py-1 text-xs transition-colors " +
               (isOn
-                ? "border border-gray-900 bg-gray-900 text-white"
+                ? "border border-[hsl(var(--ink))] bg-ink text-white"
                 : "border border-gray-300 bg-white text-gray-700 hover:border-gray-400")
             }
           >
