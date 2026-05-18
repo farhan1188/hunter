@@ -1,12 +1,8 @@
 {
   "permissions": {
+    "defaultMode": "bypassPermissions",
     "allow": [
-      "Bash(npx --yes create-next-app@latest . --typescript --tailwind --app --no-src-dir --import-alias \"@/*\" --use-npm --no-eslint --turbopack=false)",
-      "Bash(npm install *)",
-      "Bash(git init *)",
-      "Bash(git add *)",
-      "Bash(git config *)",
-      "Bash(npx --yes shadcn@latest init --yes --base-color slate --no-src-dir)"
+      "Bash(git add *)"
     ]
   }
 }

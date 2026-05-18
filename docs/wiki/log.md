@@ -13,6 +13,40 @@ Append-only chronological record of meaningful work. Newest at top. Format:
 
 ---
 
+## [2026-05-18] MCP-driven submission + 2Captcha + reality check on the Pakistan-eligible PM pool
+
+Long session pursuing "/goal apply to 10 Pakistan-eligible jobs". Net: **2 real confirmed submissions** + significant architectural progress + an honest read on the market.
+
+**Submissions confirmed (Pakistan-eligible)**:
+- Watermark Insights — Senior Growth Product Manager, Virtual, Dayforce ATS. Confirmation #90DlTevC. User solved reCAPTCHA mid-flow.
+- Canonical — Solution Architecture Manager, Home based / Worldwide, Greenhouse. Reached confirmation page, no captcha.
+
+**Architecture built (committed earlier this session: `5b6dbe5`, `44b0ef9`, `893bbae`, `6e84d73`, `65f03cf`)**:
+- Pakistan-eligibility gate at `createQualified()`.
+- Paranoid visa classifier with deterministic post-checks (regional remote, "Headquarters: X", US-city presence, "Remote - USA").
+- Cover-letter PDF rendering (`src/core/tailor/cover-letter-render.ts`) and agent attachment across greenhouse / lever / generic fillers.
+- Generic filler: Apply-CTA detection (handles JD→Apply→Auth-choice multi-step flows on Dayforce/BairesDev/etc), cookie banner dismissal.
+- Greenhouse filler: legal-name custom-question variants, family-member / personal-relationship patterns, generic Yes/No knockout fallback.
+- 2Captcha integration (`agent/src/captcha-solver.ts`, `agent/src/form-fillers/captcha-handle.ts`) — wired into greenhouse/lever/generic fillers but dormant until `TWOCAPTCHA_API_KEY` is set.
+- 24 globally-friendly Greenhouse tokens seeded (`scripts/seed-greenhouse-tokens.ts`).
+- RJF API ingest with authoritative Greenhouse JD fetch (`agent/scripts/ingest-rjf-api.ts`).
+
+**Key learning saved as skill**: `~/.claude/skills/mcp-driven-job-application` — the right pattern for ATS forms the auto-filler can't handle is to drive Playwright MCP directly (read snapshot, fill fields, click submit). Skill captures: the 4-step pattern, when to use it, the 2Captcha-vs-pause decision, the field-conventions table for Farhan's profile.
+
+**Memories saved** (5 new): `feedback_look_at_browser`, `reference_remote_job_sources`, `user_education_and_self_framing` (2.7 GPA + EE-was-wrong-fit framing), `feedback_no_em_dashes` (HARD RULE — em dashes are the #1 AI tell, ban in all user-facing text), and `feedback_gmail_source_of_truth`.
+
+**Reality check on the Pakistan-eligible AI PM/Solutions market**:
+- RJF API's `type: "worldwide"` was wrong on every candidate inspected (Counterpart Health, Clover Health, Atlassian, DEPT, Camunda, CXT, Simple Life, Avalere — all actually US/EU/regional). RJF's tagging is unreliable.
+- Greenhouse 24-token seed (4200+ jobs across gitlab/canonical/mozilla/stripe/elastic/figma/vercel/mongodb/contentful/remote/n26/airbnb/algolia/cloudflare/datadog/sumup/grafanalabs/trustpilot/circleci/pinterest/squarespace/lyft/instacart/roblox) classified ~700 active. Of those, only Canonical's 34 roles surfaced as truly Pakistan-eligible PM/Solutions fit.
+- LinkedIn AI-targeted batch (8 AI titles × US/UK/Worldwide, 125 jobs) yielded 4 eligibility-pass roles — all wrong-fit (BairesDev gated, Arm CPU eng, BSI medical-device sw, Aurora Energy AI eng).
+- Direct AI-startup careers pages (Modal/Pinecone/Replicate-now-Cloudflare): Modal is NYC/SF/Stockholm, Pinecone is US-Remote, Replicate folded into Cloudflare.
+
+**The pool is genuinely thin.** The intersection of (Pakistan-eligible) × (PM/Solutions/AI fit) × (working apply form) is small. The architecture works. The 10-target tonight wasn't achievable not because of pipeline bugs but because of actual market scarcity in that niche.
+
+**Next-session approach** (not pursued tonight): curated YC AI startup prospecting via workatastartup.com; known-PK-hire orgs (Toptal/Andela/Turing/Crossover); direct founder outreach via LinkedIn DM.
+
+---
+
 ## [2026-05-17] Pakistan-eligibility gate + search-radius expansion
 
 Investigation triggered by the user noticing that 2 of the 3 "successful" submissions (Airbnb + Axon) were US-only roles — applying to them from Pakistan is a waste at best and a profile-pollution risk at worst.
